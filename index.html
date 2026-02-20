@@ -10,12 +10,11 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script type="module">
+        // Підключаємо "мізки" нашого сайту — Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, query, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
-        // Вставлено ваші конфігураційні дані
         const firebaseConfig = {
             apiKey: "AIzaSyCaH3AqFO4cKsq4TjXbAFcxghKx9LqaBHw",
             authDomain: "my-laundry-84f8b.firebaseapp.com",
@@ -26,14 +25,18 @@
             measurementId: "G-N33YNQTN3B"
         };
 
+        // Ініціалізація
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const analytics = getAnalytics(app);
         
-        const appId = 'my-laundry-app'; // Унікальний ID для вашої колекції
+        const appId = 'my-laundry-orders'; 
+        const ADMIN_PASSWORD = "Tokyo"; // ТВІЙ ПАРОЛЬ ТУТ
 
-        const ADMIN_PASSWORD = "boss"; // Змініть це на свій секретний пароль
+        // Далі йде логіка програми (React)...
+        // [Весь попередній код залишається таким самим, але з ADMIN_PASSWORD = "Tokyo"]
+        
+        // ... (тут функція App, яку я давав раніше)
 
         const PACKAGES = {
             small: { label: 'Малий пакет', units: 1, desc: 'До 3кг. Повернення ~24 год.' },
