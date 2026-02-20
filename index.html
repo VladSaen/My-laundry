@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Запис на прання</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, query, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'laundry-v2';
+
+        const ADMIN_PASSWORD = "boss"; // Змініть це на свій секретний пароль
+
+        const PACKAGES = {
+            small: { label: 'Малий пакет', units: 1, desc: 'До 3кг. Повернення ~24 год.' },
+            medium: { label: 'Середній пакет', units: 2, desc: '3-6кг. Повернення ~24-48 год.' },
+            large: { label: 'Великий пакет', units: 4, desc: '6кг+. Займає 2 дні. Повернення ~48-72 год.' }
+        };
+
+        const DAYS_TO_SHOW = 10;
+
+        function App() {
+            const [user, setUser] = React.useState(null);
+            const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('laundry_user')) || null);
+            const [bookings, setBookings] = React.useState([]);
+            const [selectedDate, setSelectedDate] = React.useState(null);
+            const [selectedPackage, setSelectedPackage] = React.useState('small');
+            const [isRegistering, setIsRegistering] = React.useState(!profile);
+            const [isAdmin, setIsAdmin] = React.useState(profile?.isAdmin || false);
+
+            React.useEffect(() => {
+                const initAuth = async () => {
+                    try { await signInAnonymously(auth); } catch (err) { console.error(err); }
+                };
+                initAuth();
+                return onAuthStateChanged(auth, setUser);
+            }, []);
+
+            React.useEffect(() => {
+                if (!user) return;
+                const q = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setBookings(data);
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+
+            const handleRegister = (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const name = formData.get('name');
+                const room = formData.get('room');
+                const isBoss = name === ADMIN_PASSWORD;
+                
+                const newUser = { room: isBoss ? '0' : room, name, isAdmin: isBoss };
+                localStorage.setItem('laundry_user', JSON.stringify(newUser));
+                setProfile(newUser);
+                setIsAdmin(isBoss);
+                setIsRegistering(false);
+            };
+
+            const updateStatus = async (id, status) => {
+                let returnInfo = "В процесі...";
+                if (status === 'confirmed') returnInfo = "Прийнято. Очікуйте.";
+                if (status === 'ready') returnInfo = `Готово! Можна забирати.`;
+                
+                if (status === 'ready') {
+                   const time = prompt("Вкажіть час видачі (напр. Сьогодні о 20:00):", "Сьогодні о 20:00");
+                   if (time) returnInfo = `Готово! Видача: ${time}`;
+                }
+
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id), {
+                    status,
+                    returnDateInfo: returnInfo
+                });
+            };
+
+            const deleteOrder = async (id) => {
+                if(confirm("Видалити цей запис?")) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id));
+                }
+            };
+
+            const getDayLoad = (dateStr) => {
+                return bookings
+                    .filter(b => b.date === dateStr && b.status !== 'cancelled')
+                    .reduce((sum, b) => sum + (Number(b.units) || 0), 0);
+            };
+
+            const isDateAvailable = (dateStr, pkgKey) => {
+                const unitsNeeded = PACKAGES[pkgKey].units;
+                if (pkgKey === 'large') {
+                    const d1 = new Date(dateStr);
+                    const d2 = new Date(dateStr);
+                    d2.setDate(d1.getDate() + 1);
+                    const dateStr2 = d2.toISOString().split('T')[0];
+                    return getDayLoad(dateStr) === 0 && getDayLoad(dateStr2) === 0;
+                }
+                return getDayLoad(dateStr) + unitsNeeded <= 2;
+            };
+
+            const createOrder = async () => {
+                if (!selectedDate || !user) return;
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), {
+                    room: profile.room,
+                    clientName: profile.name,
+                    date: selectedDate,
+                    package: selectedPackage,
+                    units: PACKAGES[selectedPackage].units,
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                    returnDateInfo: 'Очікує підтвердження'
+                });
+                alert('Заявку відправлено!');
+                setSelectedDate(null);
+            };
+
+            if (isRegistering) {
+                return React.createElement('div', { className: "min-h-screen bg-gray-900 text-white flex items-center justify-center p-4" },
+                    React.createElement('form', { onSubmit: handleRegister, className: "bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-700" },
+                        React.createElement('h1', { className: "text-2xl font-bold mb-6 text-center text-blue-400" }, "Вхід у систему"),
+                        React.createElement('div', { className: "space-y-4" },
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, "Номер хати"),
+                                React.createElement('input', { name: "room", className: "w-full p-3 bg-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Наприклад: 12" })
+                            ),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, "Прізвисько"),
+                                React.createElement('input', { name: "name", required: true, className: "w-full p-3 bg-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Ваше ім'я" })
+                            ),
+                            React.createElement('button', { className: "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition" }, "Увійти")
+                        )
+                    )
+                );
+            }
+
+            if (isAdmin) {
+                return React.createElement('div', { className: "min-h-screen bg-gray-900 text-gray-100 p-4" },
+                    React.createElement('header', { className: "mb-6 flex justify-between items-center bg-gray-800 p-4 rounded-xl" },
+                        React.createElement('h1', { className: "text-xl font-bold text-yellow-500" }, "АДМІН-ПАНЕЛЬ"),
+                        React.createElement('button', { onClick: () => { localStorage.removeItem('laundry_user'); location.reload(); } }, 
+                            React.createElement('i', { 'data-lucide': "log-out" }))
+                    ),
+                    React.createElement('div', { className: "space-y-4" },
+                        bookings.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(order => 
+                            React.createElement('div', { key: order.id, className: "bg-gray-800 p-4 rounded-xl border border-gray-700" },
+                                React.createElement('div', { className: "flex justify-between" },
+                                    React.createElement('div', null,
+                                        React.createElement('div', { className: "font-bold text-lg" }, `Хата ${order.room} — ${order.clientName}`),
+                                        React.createElement('div', { className: "text-blue-400" }, `${PACKAGES[order.package]?.label} (${order.date})`)
+                                    ),
+                                    React.createElement('button', { onClick: () => deleteOrder(order.id), className: "text-red-500" }, 
+                                        React.createElement('i', { 'data-lucide': "trash-2", className: "w-5 h-5" }))
+                                ),
+                                React.createElement('div', { className: "mt-4 flex gap-2 overflow-x-auto pb-2" },
+                                    React.createElement('button', { onClick: () => updateStatus(order.id, 'confirmed'), className: "bg-blue-600 px-3 py-1 rounded text-xs" }, "Прийняти"),
+                                    React.createElement('button', { onClick: () => updateStatus(order.id, 'washing'), className: "bg-purple-600 px-3 py-1 rounded text-xs" }, "Перу"),
+                                    React.createElement('button', { onClick: () => updateStatus(order.id, 'ready'), className: "bg-green-600 px-3 py-1 rounded text-xs" }, "Готово"),
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+
+            // Рендер клієнтської частини (аналогічно попередньому, але додано перевірку isAdmin)
+            const myOrders = bookings.filter(b => b.room === profile.room && b.clientName === profile.name);
+            const calendarDays = [];
+            for(let i=1; i<=DAYS_TO_SHOW; i++) {
+                const d = new Date(); d.setDate(new Date().getDate() + i);
+                calendarDays.push(d.toISOString().split('T')[0]);
+            }
+
+            return React.createElement('div', { className: "min-h-screen bg-gray-900 text-gray-100 pb-20 font-sans" },
+                React.createElement('header', { className: "p-6 bg-gray-800 border-b border-gray-700 flex justify-between items-center" },
+                    React.createElement('div', null,
+                        React.createElement('h1', { className: "text-xl font-bold text-blue-400" }, `Стірка: ${profile.name}`),
+                        React.createElement('p', { className: "text-xs text-gray-400" }, `Хата ${profile.room}`)
+                    ),
+                    React.createElement('button', { onClick: () => { localStorage.removeItem('laundry_user'); location.reload(); } }, 
+                        React.createElement('i', { 'data-lucide': "log-out" }))
+                ),
+                React.createElement('main', { className: "max-w-xl mx-auto p-4 space-y-8" },
+                    myOrders.length > 0 && React.createElement('section', null,
+                        React.createElement('h2', { className: "text-xs font-bold uppercase text-gray-500 mb-3" }, "Мої замовлення"),
+                        React.createElement('div', { className: "space-y-3" },
+                            myOrders.map(order => 
+                                React.createElement('div', { key: order.id, className: "bg-gray-800 p-4 rounded-xl border-l-4 border-blue-500 shadow-md" },
+                                    React.createElement('div', { className: "flex justify-between items-start" },
+                                        React.createElement('div', null,
+                                            React.createElement('div', { className: "font-bold" }, PACKAGES[order.package]?.label),
+                                            React.createElement('div', { className: "text-xs text-gray-400" }, order.date)
+                                        ),
+                                        React.createElement('span', { className: "text-[10px] px-2 py-1 rounded bg-gray-700" }, order.status)
+                                    ),
+                                    React.createElement('div', { className: "mt-2 text-xs text-blue-300 italic" }, `✨ ${order.returnDateInfo}`)
+                                )
+                            )
+                        )
+                    ),
+                    React.createElement('section', { className: "bg-gray-800 p-6 rounded-2xl" },
+                        React.createElement('h2', { className: "text-lg font-bold mb-4" }, "Новий запис"),
+                        React.createElement('div', { className: "space-y-6" },
+                            Object.entries(PACKAGES).map(([key, pkg]) => 
+                                React.createElement('button', {
+                                    key: key,
+                                    onClick: () => { setSelectedPackage(key); setSelectedDate(null); },
+                                    className: `w-full p-3 rounded-xl border-2 text-left ${selectedPackage === key ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700'}`
+                                },
+                                    React.createElement('div', { className: "font-bold" }, pkg.label),
+                                    React.createElement('div', { className: "text-xs opacity-60" }, pkg.desc)
+                                )
+                            ),
+                            React.createElement('div', { className: "grid grid-cols-2 gap-2" },
+                                calendarDays.map(date => React.createElement('button', {
+                                    key: date,
+                                    disabled: !isDateAvailable(date, selectedPackage),
+                                    onClick: () => setSelectedDate(date),
+                                    className: `p-3 rounded-xl text-sm ${selectedDate === date ? 'bg-blue-600' : isDateAvailable(date, selectedPackage) ? 'bg-gray-700' : 'opacity-20'}`
+                                }, new Date(date).toLocaleDateString('uk', {day:'numeric', month:'short'})))
+                            ),
+                            React.createElement('button', {
+                                onClick: createOrder,
+                                disabled: !selectedDate,
+                                className: "w-full bg-green-600 py-4 rounded-xl font-bold disabled:opacity-30"
+                            }, "Записатись")
+                        )
+                    )
+                )
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</head>
+<body class="bg-gray-900">
+    <div id="root"></div>
+</body>
+</html>
