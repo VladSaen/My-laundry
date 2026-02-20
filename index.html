@@ -13,12 +13,25 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, query, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // Вставлено ваші конфігураційні дані
+        const firebaseConfig = {
+            apiKey: "AIzaSyCaH3AqFO4cKsq4TjXbAFcxghKx9LqaBHw",
+            authDomain: "my-laundry-84f8b.firebaseapp.com",
+            projectId: "my-laundry-84f8b",
+            storageBucket: "my-laundry-84f8b.firebasestorage.app",
+            messagingSenderId: "524025568005",
+            appId: "1:524025568005:web:65f72b000e8db75938f56c",
+            measurementId: "G-N33YNQTN3B"
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'laundry-v2';
+        const analytics = getAnalytics(app);
+        
+        const appId = 'my-laundry-app'; // Унікальний ID для вашої колекції
 
         const ADMIN_PASSWORD = "boss"; // Змініть це на свій секретний пароль
 
@@ -177,7 +190,6 @@
                 );
             }
 
-            // Рендер клієнтської частини (аналогічно попередньому, але додано перевірку isAdmin)
             const myOrders = bookings.filter(b => b.room === profile.room && b.clientName === profile.name);
             const calendarDays = [];
             for(let i=1; i<=DAYS_TO_SHOW; i++) {
