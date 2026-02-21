@@ -8,7 +8,6 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -33,222 +32,235 @@ const auth = getAuth(app);
 const ADMIN_PASSWORD = "Tokyo";
 
 const PACKAGES = {
-small: { label: 'Малий пакет', hours: 24, desc: 'До 5кг. ~24 год.' },
-medium: { label: 'Середній пакет', hours: 48, desc: '5-10кг. ~48 год.' },
-large: { label: 'Великий пакет', hours: 72, desc: '10кг+. ~72 год.' }
+small: { label: 'Малий пакет' },
+medium: { label: 'Середній пакет' },
+large: { label: 'Великий пакет' }
 };
 
-function App() {
+function App(){
 
-const [user, setUser] = React.useState(null);
-const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('laundry_user')) || null);
-const [bookings, setBookings] = React.useState([]);
-const [selectedDate, setSelectedDate] = React.useState(null);
-const [selectedPackage, setSelectedPackage] = React.useState('small');
-const [isRegistering, setIsRegistering] = React.useState(!profile);
-const [now, setNow] = React.useState(Date.now());
+const [user,setUser]=React.useState(null);
+const [profile,setProfile]=React.useState(()=>JSON.parse(localStorage.getItem('laundry_user'))||null);
+const [bookings,setBookings]=React.useState([]);
+const [selectedDate,setSelectedDate]=React.useState(null);
+const [selectedPackage,setSelectedPackage]=React.useState('small');
+const [isRegistering,setIsRegistering]=React.useState(!profile);
 
-const [regName, setRegName] = React.useState('');
-const [regRoom, setRegRoom] = React.useState('');
+const [regName,setRegName]=React.useState('');
+const [regRoom,setRegRoom]=React.useState('');
 
-/* ---------- LIVE TIMER ---------- */
-React.useEffect(() => {
-const interval = setInterval(() => setNow(Date.now()), 60000);
-return () => clearInterval(interval);
-}, []);
+React.useEffect(()=>{
+signInAnonymously(auth);
+return onAuthStateChanged(auth,setUser);
+},[]);
 
-/* ---------- AUTO COMPLETE & AUTO DELETE ---------- */
-React.useEffect(() => {
-bookings.forEach(async order => {
-if (order.finishAt) {
-const finish = order.finishAt.toDate().getTime();
-if (finish <= now && order.status !== 'Завершено') {
-await updateDoc(doc(db,'orders',order.id),{
-status:'Завершено',
-completedAt: new Date()
-});
-}
-}
-if (order.completedAt) {
-const completed = order.completedAt.toDate().getTime();
-if (now - completed >= 12 * 60 * 60 * 1000) {
-await deleteDoc(doc(db,'orders',order.id));
-}
-}
-});
-}, [now, bookings]);
-
-React.useEffect(() => {
-signInAnonymously(auth).catch(console.error);
-return onAuthStateChanged(auth, setUser);
-}, []);
-
-React.useEffect(() => {
-if (!user) return;
-return onSnapshot(collection(db,'orders'), snapshot=>{
+React.useEffect(()=>{
+if(!user)return;
+return onSnapshot(collection(db,'orders'),snapshot=>{
 setBookings(snapshot.docs.map(doc=>({id:doc.id,...doc.data()})));
 });
-}, [user]);
+},[user]);
 
-React.useEffect(()=>{ if(window.lucide) window.lucide.createIcons(); });
-
-const isRoomValid = (room)=>{
+const isRoomValid=(room)=>{
 const r=parseInt(room);
 return (r>=90&&r<=121)||(r>=340&&r<=344);
 };
 
-const calculateRemainingHours=(finishAt)=>{
-if(!finishAt) return null;
-const diff=finishAt.toDate()-now;
-if(diff<=0) return 0;
-return Math.ceil(diff/(1000*60*60));
+const getCalendarDays=()=>{
+const days=[];
+for(let i=1;i<=10;i++){
+const d=new Date();
+d.setDate(d.getDate()+i);
+days.push({
+date:d.toISOString().split('T')[0],
+day:d.getDate()
+});
+}
+return days;
 };
 
-/* ---------- ADMIN SECRET ---------- */
-const handleSecretAdmin=()=>{
-const pass=prompt("Введіть пароль:");
-if(pass===ADMIN_PASSWORD){
+/* ---------------- REGISTRATION ---------------- */
+if(isRegistering){
+const showWarning=regRoom!==''&&!isRoomValid(regRoom);
+
+return (
+<div className="min-h-screen bg-black text-white flex items-center justify-center p-6 relative">
+<div onClick={()=>{
+const pass=prompt("Пароль:");
+if(pass==="Tokyo"){
 const adminUser={room:'ADMIN',name:'Адмін',isAdmin:true};
 localStorage.setItem('laundry_user',JSON.stringify(adminUser));
 setProfile(adminUser);
 setIsRegistering(false);
 }
-};
+}} className="absolute top-0 right-0 w-20 h-20"/>
 
-/* ================= REGISTRATION ================= */
-if(isRegistering){
-const showWarning = regRoom!=='' && !isRoomValid(regRoom);
-
-return React.createElement('div',{className:"min-h-screen bg-black text-white flex items-center justify-center p-6 relative"},
-React.createElement('div',{onClick:handleSecretAdmin,className:"absolute top-0 right-0 w-20 h-20 z-50"}),
-
-React.createElement('form',{
-onSubmit:(e)=>{
+<form onSubmit={(e)=>{
 e.preventDefault();
-if(!isRoomValid(regRoom)) return;
+if(!isRoomValid(regRoom))return;
 const newUser={room:regRoom,name:regName,isAdmin:false};
 localStorage.setItem('laundry_user',JSON.stringify(newUser));
 setProfile(newUser);
 setIsRegistering(false);
-},
-className:"bg-gray-900 p-8 rounded-[2.5rem] w-full max-w-sm border border-gray-800"
-},
+}}
+className="bg-gray-900 p-8 rounded-3xl w-full max-w-sm">
 
-React.createElement('h1',{className:"text-2xl font-black mb-6 text-blue-500 text-center"},"Запис на прання"),
+<h1 className="text-2xl font-bold mb-6 text-blue-500 text-center">Запис на прання</h1>
 
-React.createElement('input',{
-value:regName,onChange:e=>setRegName(e.target.value),
-required:true,placeholder:"Ваше ім'я",
-className:"w-full p-4 mb-4 bg-gray-800 rounded-2xl outline-none"
-}),
+<input value={regName} onChange={e=>setRegName(e.target.value)} required placeholder="Ваше ім'я"
+className="w-full p-4 mb-4 bg-gray-800 rounded-2xl"/>
 
-React.createElement('input',{
-type:"number",value:regRoom,onChange:e=>setRegRoom(e.target.value),
-required:true,placeholder:"Номер камери",
-className:"w-full p-4 mb-2 bg-gray-800 rounded-2xl outline-none"
-}),
+<input type="number" value={regRoom} onChange={e=>setRegRoom(e.target.value)} required placeholder="Номер камери"
+className="w-full p-4 mb-2 bg-gray-800 rounded-2xl"/>
 
-showWarning && React.createElement('div',{className:"text-xs text-red-400 mb-4"},
-"Ця камера не може резервувати дні онлайн."
-),
+{showWarning && <div className="text-xs text-red-400 mb-4">
+Ця камера не може резервувати дні онлайн.
+</div>}
 
-React.createElement('button',{
-disabled:showWarning||!regName||!regRoom,
-className:"w-full bg-blue-600 disabled:bg-gray-700 py-4 rounded-2xl font-bold"
-},"Увійти")
-)
+<button disabled={showWarning||!regName||!regRoom}
+className="w-full bg-blue-600 disabled:bg-gray-700 py-4 rounded-2xl font-bold">
+Увійти
+</button>
+
+</form>
+</div>
 );
 }
 
-/* ================= ADMIN PANEL ================= */
+/* ---------------- ADMIN ---------------- */
 if(profile?.isAdmin){
-return React.createElement('div',{className:"min-h-screen bg-black text-white p-4"},
-React.createElement('div',{className:"flex justify-between mb-6"},
-React.createElement('h1',{className:"text-yellow-500 font-bold"},"Адмін-панель"),
-React.createElement('button',{onClick:()=>{localStorage.clear();location.reload();},className:"text-red-500"},"ВИЙТИ")
-),
 
-bookings.map(order=>{
-const remaining=calculateRemainingHours(order.finishAt);
+const days=getCalendarDays();
 
-return React.createElement('div',{key:order.id,className:"bg-gray-900 p-4 mb-3 rounded-2xl"},
-React.createElement('div',{className:"font-bold"},"🏠 Камера "+order.room),
-React.createElement('div',{className:"text-sm text-gray-400"},order.clientName),
-React.createElement('div',{className:"text-blue-400"},order.date),
+return (
+<div className="min-h-screen bg-black text-white p-6">
 
-remaining!==null && order.status!=='Завершено' &&
-React.createElement('div',{className:"text-green-400 text-sm mt-1"},
-"~ "+remaining+" год."
-),
+<div className="flex justify-between mb-6">
+<h1 className="text-yellow-500 font-bold">Адмін-панель</h1>
+<button onClick={()=>{localStorage.clear();location.reload();}}
+className="text-red-500">ВИЙТИ</button>
+</div>
 
-React.createElement('div',{className:"mt-2 space-x-2"},
+<div className="grid grid-cols-5 gap-4">
+{days.map(day=>{
+const dayOrders=bookings.filter(b=>b.date===day.date);
+return(
+<div key={day.date} className="bg-gray-900 p-4 rounded-2xl">
+<div className="font-bold mb-2">{day.day}</div>
+{dayOrders.map(order=>(
+<div key={order.id} className="text-xs mb-2 p-2 bg-gray-800 rounded-xl">
+<div>Камера {order.room}</div>
 
-React.createElement('button',{
-onClick:async()=>{
-const input=prompt("Через скільки годин завершити?");
-if(!input) return;
-const hours=parseInt(input);
-if(isNaN(hours)) return;
-const finish=new Date(Date.now()+hours*60*60*1000);
-await updateDoc(doc(db,'orders',order.id),{
-status:'В роботі',
-finishAt:finish
-});
-},
-className:"bg-green-600 px-3 py-2 rounded-xl text-sm"
-},"Завершити через…"),
+<div className="flex gap-2 mt-1">
+<button onClick={()=>updateDoc(doc(db,'orders',order.id),{
+status:'Підтверджено'
+})}
+className="text-green-400">✔</button>
 
-React.createElement('button',{
-onClick:()=>deleteDoc(doc(db,'orders',order.id)),
-className:"bg-red-600 px-3 py-2 rounded-xl text-sm"
-},"Видалити")
-)
+<button onClick={()=>updateDoc(doc(db,'orders',order.id),{
+status:'Відхилено'
+})}
+className="text-red-400">✖</button>
+</div>
+</div>
+))}
+</div>
 );
-})
+})}
+</div>
+
+</div>
 );
 }
 
-/* ================= USER PANEL ================= */
-const myOrders = bookings.filter(b=>b.room===profile.room && b.clientName===profile.name);
+/* ---------------- USER ---------------- */
+const myOrders=bookings.filter(b=>b.room===profile.room);
 
-return React.createElement('div',{className:"min-h-screen bg-black text-white font-sans pb-10"},
-React.createElement('header',{className:"p-6 flex justify-between items-center sticky top-0 bg-black/80"},
-React.createElement('div',null,
-React.createElement('h1',{className:"text-xl font-black text-blue-500"},profile.name),
-React.createElement('p',{className:"text-xs text-gray-500"},"Камера "+profile.room)
-),
-React.createElement('button',{onClick:()=>{localStorage.clear();location.reload();},className:"p-3 bg-gray-900 rounded-2xl"},
-React.createElement('i',{'data-lucide':"log-out",className:"w-5 h-5"})
-)
-),
+const days=getCalendarDays();
 
-React.createElement('main',{className:"max-w-md mx-auto px-4 space-y-6"},
+return (
+<div className="min-h-screen bg-black text-white p-6">
 
-myOrders.map(order=>{
-const remaining=calculateRemainingHours(order.finishAt);
-return React.createElement('div',{key:order.id,className:"bg-gray-900 p-5 rounded-3xl border-l-4 border-blue-600"},
-React.createElement('div',{className:"font-bold"},PACKAGES[order.package]?.label),
-React.createElement('div',{className:"text-xs text-gray-400 mt-1"},order.date),
-React.createElement('div',{className:"text-sm mt-2"},
-order.status==='Завершено'
-? "Завершено"
-: remaining!==null
-? "До повернення: ~ "+remaining+" год."
-: order.status
-)
+<div className="flex justify-between mb-6">
+<div>
+<h1 className="text-blue-500 font-bold">{profile.name}</h1>
+<div className="text-xs text-gray-500">Камера {profile.room}</div>
+</div>
+<button onClick={()=>{localStorage.clear();location.reload();}}
+className="text-red-500">Вийти</button>
+</div>
+
+{/* МОЇ ЗАМОВЛЕННЯ */}
+<div className="grid grid-cols-5 gap-4 mb-8">
+{days.map(day=>{
+const order=myOrders.find(o=>o.date===day.date);
+return(
+<div key={day.date} className="bg-gray-900 p-4 rounded-2xl text-center">
+
+<div className="font-bold">{day.day}</div>
+
+{order && (
+<div className="mt-2 text-xs">
+{order.status==='Очікування' || !order.status ? (
+<span className="text-yellow-400">Очікування підтвердження</span>
+) : order.status==='Підтверджено' ? (
+<span className="text-green-400">Підтверджено ✔</span>
+) : order.status==='Відхилено' ? (
+<span className="text-red-400">Відхилено ✖</span>
+) : order.status}
+</div>
+)}
+
+</div>
 );
-})
-)
+})}
+</div>
+
+{/* ВИБІР ДАТИ */}
+<h2 className="mb-4 font-bold">Оберіть дату</h2>
+<div className="grid grid-cols-5 gap-3 mb-6">
+{days.map(d=>(
+<button key={d.date}
+onClick={()=>setSelectedDate(d.date)}
+className={`p-4 rounded-xl ${selectedDate===d.date?'bg-blue-600':'bg-gray-800'}`}>
+{d.day}
+</button>
+))}
+</div>
+
+{/* ВИБІР ПАКЕТУ */}
+<div className="mb-6">
+{Object.entries(PACKAGES).map(([key,p])=>(
+<button key={key}
+onClick={()=>setSelectedPackage(key)}
+className={`block w-full p-3 mb-2 rounded-xl ${selectedPackage===key?'bg-blue-600':'bg-gray-800'}`}>
+{p.label}
+</button>
+))}
+</div>
+
+<button disabled={!selectedDate}
+onClick={()=>addDoc(collection(db,'orders'),{
+room:profile.room,
+clientName:profile.name,
+date:selectedDate,
+package:selectedPackage,
+status:'Очікування',
+adminComment:''
+})}
+className="w-full bg-blue-600 py-4 rounded-2xl font-bold disabled:bg-gray-700">
+Підтвердити запис
+</button>
+
+</div>
 );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 
 <style>
-body{background:black;color:white;-webkit-tap-highlight-color:transparent;}
-input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+body{background:black;color:white;}
 </style>
 </head>
 <body>
