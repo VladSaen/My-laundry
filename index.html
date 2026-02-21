@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lndry 6.0</title>
+    <title>Запис на прання</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -24,11 +24,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const PKG = {
-            small: { n: 'Малий', h: 24 },
-            medium: { n: 'Середній', h: 48 },
-            large: { n: 'Великий', h: 72 }
-        };
+        const PKG = { small: { n: 'Малий', h: 24 }, medium: { n: 'Середній', h: 48 }, large: { n: 'Великий', h: 72 } };
 
         function App() {
             const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
@@ -42,95 +38,89 @@
                 const timer = setInterval(() => setNow(Date.now()), 60000);
                 return onSnapshot(collection(db, 'orders'), s => {
                     const docs = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // Автовидалення через 12 годин після завершення
-                    docs.forEach(d => {
-                        if (d.finishAt && (Date.now() - d.finishAt > 12 * 3600000)) deleteDoc(doc(db, 'orders', d.id));
-                    });
                     setBookings(docs);
                 });
             }, []);
 
             const isV = r => { const n = parseInt(r); return (n >= 90 && n <= 121) || (n >= 340 && n <= 344); };
-            
             const getT = f => {
                 if (!f) return null;
                 const d = f - now;
                 return d <= 0 ? "ГОТОВО" : `~ ${Math.ceil(d / 3600000)} год.`;
             };
 
-            if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans" },
-                React.createElement('div', { onClick: () => { if(prompt('?')==='Tokyo') setProfile({adm:true}); }, className: "absolute top-0 right-0 w-20 h-20" }),
-                React.createElement('h1', { className: "text-3xl font-black text-blue-500 mb-8 text-center" }, "LNDRY"),
-                React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-gray-900 rounded-2xl outline-none" }),
-                React.createElement('input', { id: "r", type: "number", placeholder: "Номер камери", className: "p-4 mb-6 bg-gray-900 rounded-2xl outline-none" }),
+            if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8" },
+                React.createElement('div', { onClick: () => { if(prompt('?')==='Tokyo') { const a={adm:true}; setProfile(a); localStorage.setItem('l_u', JSON.stringify(a)); } }, className: "absolute top-0 right-0 w-20 h-20" }),
+                React.createElement('h1', { className: "text-2xl font-black text-blue-500 mb-8 text-center uppercase" }, "Авторизація"),
+                React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-gray-900 rounded-2xl outline-none border border-gray-800" }),
+                React.createElement('input', { id: "r", type: "number", placeholder: "Номер камери", className: "p-4 mb-6 bg-gray-900 rounded-2xl outline-none border border-gray-800" }),
                 React.createElement('button', { 
                     onClick: () => {
                         const n = document.getElementById('n').value, r = document.getElementById('r').value;
                         if(n && isV(r)) { const u = {n, r, adm:false}; localStorage.setItem('l_u', JSON.stringify(u)); setProfile(u); }
-                    },
-                    className: "bg-blue-600 py-4 rounded-2xl font-bold" 
+                    }, className: "bg-blue-600 py-4 rounded-2xl font-bold" 
                 }, "УВІЙТИ")
             );
 
             if (profile.adm) return React.createElement('div', { className: "p-4 bg-black min-h-screen text-white font-sans" },
-                React.createElement('div', { className: "flex justify-between mb-6" }, React.createElement('b', {className:"text-yellow-500"}, "АДМІН"), React.createElement('button', {onClick:()=>location.reload(localStorage.clear())}, "ВИХІД")),
-                bookings.sort((a,b)=>a.date.localeCompare(b.date)).map(b => React.createElement('div', { key: b.id, className: "bg-gray-900 p-5 mb-4 rounded-[2rem] border border-gray-800" },
+                React.createElement('div', { className: "flex justify-between mb-6 items-center" }, React.createElement('b', {className:"text-yellow-500 text-xl font-black"}, "АДМІН-ПАНЕЛЬ"), React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}}, "ВИХІД")),
+                bookings.sort((a,b)=>a.date.localeCompare(b.date)).map(b => React.createElement('div', { key: b.id, className: "bg-gray-900 p-5 mb-4 rounded-3xl border border-gray-800" },
                     React.createElement('div', { className: "flex justify-between" },
                         React.createElement('div', null,
-                            React.createElement('div', {className:"font-bold text-lg"}, `${b.room} — ${b.clientName}`),
-                            React.createElement('div', {className:"text-blue-400 text-sm"}, `${b.date} | ${PKG[b.package]?.n}`),
-                            React.createElement('div', {className:"text-gray-500 text-xs italic mt-1"}, b.note || "виставляйте стірку по мусору")
+                            React.createElement('div', {className:"font-bold"}, `${b.room} — ${b.clientName}`),
+                            React.createElement('div', {className:"text-blue-400 text-xs"}, `${b.date} | ${PKG[b.package]?.n}`),
+                            React.createElement('div', {className:"text-gray-500 text-[10px] italic mt-1"}, b.note || "виставляйте стірку по мусору")
                         ),
-                        React.createElement('button', {onClick:()=>deleteDoc(doc(db,'orders',b.id))}, "❌")
+                        React.createElement('button', {onClick:()=>deleteDoc(doc(db,'orders',b.id))}, "🗑️")
                     ),
-                    !b.finishAt ? React.createElement('div', {className:"mt-4 grid grid-cols-2 gap-2"},
-                        React.createElement('button', {
-                            onClick: () => {
-                                const hrs = prompt("Через скільки годин? (або напиши 'день' для 24, 'вечір' для 12)");
-                                let h = parseInt(hrs);
-                                if(hrs === 'день') h = 24; if(hrs === 'вечір') h = 12;
-                                if(h) {
-                                    const start = new Date(b.date); start.setHours(7,0,0,0);
-                                    const f = Math.max(Date.now(), start.getTime()) + (h * 3600000);
-                                    updateDoc(doc(db,'orders',b.id), {status:'Підтверджено', finishAt: f, note: prompt("Коментар?") || ""});
-                                }
-                            }, className:"bg-green-600 p-2 rounded-xl text-xs font-bold"
-                        }, "ПІДТВЕРДИТИ")
-                    ) : React.createElement('div', {className:"mt-2 text-green-500 font-bold"}, getT(b.finishAt))
+                    !b.finishAt ? React.createElement('button', {
+                        onClick: () => {
+                            const hrs = prompt("Годин?");
+                            if(hrs) {
+                                const start = new Date(b.date); start.setHours(7,0,0,0);
+                                const f = Math.max(Date.now(), start.getTime()) + (parseInt(hrs) * 3600000);
+                                updateDoc(doc(db,'orders',b.id), {status:'Підтверджено', finishAt: f, note: prompt("Коментар?") || ""});
+                            }
+                        }, className:"w-full mt-4 bg-green-600 p-2 rounded-xl text-xs font-bold"
+                    }, "ПІДТВЕРДИТИ") : React.createElement('div', {className:"mt-2 text-green-500 font-bold"}, getT(b.finishAt))
                 ))
             );
 
             const my = bookings.filter(b => b.room === profile.r && b.clientName === profile.n);
-            return React.createElement('div', { className: "min-h-screen bg-black text-white pb-10 font-sans" },
-                React.createElement('header', { className: "p-6 flex justify-between items-center" },
-                    React.createElement('div', null, React.createElement('h1', {className:"text-xl font-black text-blue-500"}, profile.n), React.createElement('p', {className:"text-xs text-gray-500"}, `Кам. ${profile.r}`)),
-                    React.createElement('button', {onClick:()=>location.reload(localStorage.clear())}, "Вихід")
+            return React.createElement('div', { className: "min-h-screen bg-black text-white pb-10" },
+                React.createElement('header', { className: "p-6 flex justify-between items-center sticky top-0 bg-black/80 backdrop-blur-md border-b border-gray-900" },
+                    React.createElement('div', null, React.createElement('b', {className:"text-blue-500 text-lg"}, profile.n), React.createElement('p', {className:"text-[10px] text-gray-500 uppercase"}, `Камера ${profile.r}`)),
+                    React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"bg-gray-900 p-2 rounded-xl text-xs"}, "Вихід")
                 ),
-                React.createElement('main', { className: "max-w-sm mx-auto px-4" },
-                    my.map(o => React.createElement('div', { key: o.id, className: "bg-gray-900 rounded-[2rem] border border-gray-800 mb-6 overflow-hidden" },
-                        React.createElement('div', { className: `p-2 text-[10px] font-black text-center ${o.finishAt ? 'bg-green-600/20 text-green-500' : 'bg-orange-600/20 text-orange-500'}` },
-                            o.finishAt ? '✅ ПІДТВЕРДЖЕНО' : '⏳ ОЧІКУВАННЯ ПІДТВЕРДЖЕННЯ'
-                        ),
-                        React.createElement('div', {className:"p-5"},
-                            React.createElement('div', {className:"flex justify-between items-center"},
+                React.createElement('main', { className: "p-4 space-y-6 max-w-sm mx-auto" },
+                    my.length > 0 && React.createElement('div', { className: "flex gap-4 overflow-x-auto pb-4 snap-x" },
+                        my.map(o => React.createElement('div', { key: o.id, className: "min-w-[280px] bg-gray-900 rounded-[2rem] border border-gray-800 snap-center overflow-hidden flex-shrink-0" },
+                            React.createElement('div', { className: `p-2 text-[10px] font-black text-center ${o.finishAt ? 'bg-green-600/20 text-green-500' : 'bg-orange-600/20 text-orange-500'}` },
+                                o.finishAt ? '✅ ПІДТВЕРДЖЕНО' : '⏳ ОЧІКУВАННЯ ПІДТВЕРДЖЕННЯ'
+                            ),
+                            React.createElement('div', {className:"p-5 flex justify-between items-center"},
                                 React.createElement('div', null, React.createElement('p', {className:"font-bold"}, PKG[o.package]?.n), React.createElement('p', {className:"text-xs text-gray-500"}, o.date)),
                                 o.finishAt && React.createElement('p', {className:"text-blue-400 font-black text-lg"}, getT(o.finishAt))
                             ),
-                            React.createElement('p', {className:"text-[10px] text-gray-400 mt-4 border-t border-gray-800 pt-2"}, o.note || "виставляйте стірку по мусору")
-                        )
-                    )),
-                    React.createElement('div', { className: "bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800" },
+                            React.createElement('p', {className:"px-5 pb-4 text-[10px] text-gray-500 italic"}, o.note || "виставляйте стірку по мусору")
+                        ))
+                    ),
+                    React.createElement('div', { className: "bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800 shadow-2xl" },
                         React.createElement('div', { className: "grid grid-cols-5 gap-2 mb-6" }, Array.from({length:10}, (_,i)=>{
                             const d = new Date(); d.setDate(d.getDate()+i+1); const ds = d.toISOString().split('T')[0];
                             const isB = bookings.some(b => b.date === ds);
                             return React.createElement('button', {
                                 key:ds, disabled:isB, onClick:()=>setSelD(ds),
-                                className:`aspect-square rounded-xl font-bold ${selD===ds?'bg-blue-600':isB?'bg-red-900/10 text-red-900':'bg-gray-800'}`
+                                className:`aspect-square rounded-xl font-bold ${selD===ds?'bg-blue-600':isB?'text-red-900':'bg-black/40 border border-gray-800'}`
                             }, d.getDate());
                         })),
+                        Object.entries(PKG).map(([k, p]) => React.createElement('button', {
+                            key: k, onClick: () => setSelP(k),
+                            className: `p-4 mb-2 rounded-2xl border-2 w-full text-left transition-all ${selP === k ? 'border-blue-600 bg-blue-600/10' : 'border-gray-800 bg-black/20 opacity-60'}`
+                        }, React.createElement('div', {className:"font-bold text-sm"}, p.n), React.createElement('div', {className:"text-[10px] text-gray-500"}, `~ ${p.h} год.`))),
                         React.createElement('button', { 
                             onClick: () => addDoc(collection(db,'orders'), {room:profile.r, clientName:profile.n, date:selD, package:selP, status:'Новий', createdAt:serverTimestamp()}),
-                            disabled: !selD, className: "w-full bg-blue-600 py-5 rounded-3xl font-black disabled:opacity-10 transition-all"
+                            disabled: !selD, className: "w-full bg-blue-600 py-5 rounded-3xl font-black text-lg mt-4 disabled:opacity-10 transition-all"
                         }, "ЗАПИСАТИСЯ")
                     )
                 )
@@ -138,7 +128,7 @@
         }
         ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
     </script>
-    <style> body { background: black; -webkit-tap-highlight-color: transparent; } </style>
+    <style> body { background: black; color: white; -webkit-tap-highlight-color: transparent; } </style>
 </head>
 <body><div id="root"></div></body>
 </html>
