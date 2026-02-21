@@ -74,7 +74,6 @@
             };
 
             if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans relative" },
-                // ТА сама кнопка в кутку для адміна
                 React.createElement('div', { 
                     onClick: () => { 
                         const p = prompt('Password?');
@@ -122,36 +121,44 @@
                             )
                         );
                     })),
-                    dayBookings.map((b, index) => React.createElement('div', { key: b.id, className: "bg-gray-900 p-5 mb-4 rounded-3xl border border-gray-800 shadow-xl" },
-                        React.createElement('div', { className: "flex justify-between items-start mb-4" },
-                            React.createElement('div', null,
-                                React.createElement('div', {className:"font-black text-xl leading-none"}, `${b.r} — ${b.n}`),
-                                React.createElement('div', {className:"text-blue-400 text-[10px] font-black uppercase mt-1 tracking-wider font-sans"}, PKG[b.package]?.n)
+                    dayBookings.map((b, index) => {
+                        const dP = (b.d || b.date).split('-');
+                        const mTime = new Date(dP[0], dP[1]-1, dP[2], 6, 0, 0).getTime();
+                        const isAfterMorning = now > mTime;
+
+                        return React.createElement('div', { key: b.id, className: "bg-gray-900 p-5 mb-4 rounded-3xl border border-gray-800 shadow-xl" },
+                            React.createElement('div', { className: "flex justify-between items-start mb-4" },
+                                React.createElement('div', null,
+                                    React.createElement('div', {className:"font-black text-xl leading-none"}, `${b.r} — ${b.n}`),
+                                    React.createElement('div', {className:"text-blue-400 text-[10px] font-black uppercase mt-1 tracking-wider font-sans"}, PKG[b.package]?.n)
+                                ),
+                                React.createElement('button', {onClick:()=>deleteDoc(doc(db,'orders',b.id)), className:"text-gray-700 p-1"}, "🗑️")
                             ),
-                            React.createElement('button', {onClick:()=>deleteDoc(doc(db,'orders',b.id)), className:"text-gray-700 p-1"}, "🗑️")
-                        ),
-                        React.createElement('textarea', {
-                            placeholder: "Напишіть коментар юзеру...",
-                            defaultValue: b.note || "",
-                            onBlur: (e) => updateDoc(doc(db,'orders',b.id), {note: e.target.value}),
-                            className: "w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs mb-4 outline-none focus:border-blue-500/30 transition min-h-[60px] text-gray-300"
-                        }),
-                        !b.finishAt ? React.createElement('button', {
-                            onClick: () => {
-                                const baseWait = PKG[b.package].d;
-                                const extra = index > 0 ? 24 : 0;
-                                updateDoc(doc(db,'orders',b.id), {status:'Підтверджено', finishAt: Date.now() + ((baseWait + extra) * 3600000)});
-                            }, className:"w-full bg-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/30 font-sans"
-                        }, "Підтвердити") : React.createElement('div', {className:"flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5"},
-                            React.createElement('span', {className:"text-green-500 font-black text-[10px] uppercase tracking-wider"}, `В роботі: ${getT(b.finishAt)}`),
-                            React.createElement('button', {
+                            React.createElement('textarea', {
+                                placeholder: "Напишіть коментар юзеру...",
+                                defaultValue: b.note || "",
+                                onBlur: (e) => updateDoc(doc(db,'orders',b.id), {note: e.target.value}),
+                                className: "w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs mb-4 outline-none focus:border-blue-500/30 transition min-h-[60px] text-gray-300"
+                            }),
+                            !b.finishAt ? React.createElement('button', {
                                 onClick: () => {
-                                    const h = prompt("Змінити час (год від зараз)?");
-                                    if(h) updateDoc(doc(db,'orders',b.id), {finishAt: Date.now() + (parseInt(h) * 3600000)});
-                                }, className:"text-gray-500 text-sm"
-                            }, "✏️")
-                        )
-                    ))
+                                    const baseWait = PKG[b.package].d;
+                                    const extra = index > 0 ? 24 : 0;
+                                    updateDoc(doc(db,'orders',b.id), {status:'Підтверджено', finishAt: Date.now() + ((baseWait + extra) * 3600000)});
+                                }, className:"w-full bg-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/30 font-sans"
+                            }, "Підтвердити") : React.createElement('div', {className:"flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5"},
+                                React.createElement('span', {className: `${isAfterMorning ? 'text-green-500' : 'text-blue-400'} font-black text-[10px] uppercase tracking-wider`}, 
+                                    isAfterMorning ? `В роботі: ${getT(b.finishAt)}` : `До забору (06:00): ${getT(mTime)}`
+                                ),
+                                React.createElement('button', {
+                                    onClick: () => {
+                                        const h = prompt("Змінити час повернення (год від зараз)?");
+                                        if(h) updateDoc(doc(db,'orders',b.id), {finishAt: Date.now() + (parseInt(h) * 3600000)});
+                                    }, className:"text-gray-500 text-sm"
+                                }, "✏️")
+                            )
+                        );
+                    })
                 );
             }
 
