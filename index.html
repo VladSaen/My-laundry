@@ -37,11 +37,14 @@
                 const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
                 gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).split(' ').pop();
             } catch(err) {}
-            
-            if (/iPhone/i.test(ua)) return `iPhone | ${res} | ${gpu}`;
-            if (/Android/i.test(ua)) return `Android | ${res} | ${gpu}`;
-            return `PC | ${res}`;
+            return `${ua.includes('iPhone') ? 'iPhone' : 'Android'} | ${res} | ${gpu}`;
         };
+
+        const PKG = [
+            { id: 'small', label: 'До 3 кг', icon: '👕' },
+            { id: 'medium', label: '3-5 кг', icon: '🧺' },
+            { id: 'large', label: '5+ кг', icon: '🐋' }
+        ];
 
         function App() {
             const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
@@ -49,134 +52,130 @@
             const [view, setView] = React.useState('active'); 
             const [selD, setSelD] = React.useState(new Date().toISOString().split('T')[0]);
             const [curM, setCurM] = React.useState(new Date());
+            const [selPkg, setSelPkg] = React.useState('small');
+
+            const today = new Date().toISOString().split('T')[0];
 
             React.useEffect(() => {
                 signInAnonymously(auth);
                 return onSnapshot(collection(db, 'orders'), s => setBookings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
             }, []);
 
-            const renderCalendar = (onDayClick, selectedDay) => {
+            const renderCalendar = (onDayClick, selectedDay, isAdmin = false) => {
                 const y = curM.getFullYear(), m = curM.getMonth();
                 const first = new Date(y, m, 1).getDay();
                 const offset = first === 0 ? 6 : first - 1;
                 const days = new Date(y, m + 1, 0).getDate();
                 const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
-                const daysElements = [];
-                // Заголовки днів тижня
-                WD.forEach(d => daysElements.push(e('div', { key: d, className: "text-[8px] text-gray-700 text-center font-black uppercase" }, d)));
-                // Пусті клітинки
-                for (let i = 0; i < offset; i++) daysElements.push(e('div', { key: 'o'+i }));
-                // Дні місяця
+                const cells = [];
+                WD.forEach(d => cells.push(e('div', { key: d, className: "text-[7px] text-zinc-600 text-center font-black uppercase mb-1" }, d)));
+                for (let i = 0; i < offset; i++) cells.push(e('div', { key: 'o'+i }));
                 for (let d = 1; d <= days; d++) {
                     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    const act = bookings.filter(b => b.d === ds && !b.archived);
-                    const isFull = act.length >= 2;
-                    daysElements.push(e('div', {
+                    const isPast = ds < today;
+                    const count = bookings.filter(b => b.d === ds && !b.archived).length;
+                    cells.push(e('div', {
                         key: d,
-                        onClick: () => onDayClick(ds),
-                        className: `aspect-square flex items-center justify-center rounded-2xl text-xs font-black border transition-all cursor-pointer ${selectedDay === ds ? 'bg-blue-600 border-blue-400 scale-110' : isFull ? 'bg-red-900/10 border-red-900/20 text-red-500' : 'bg-black/40 border-white/5'}`
+                        onClick: () => (!isPast || isAdmin) && onDayClick(ds),
+                        className: `aspect-square flex items-center justify-center rounded-xl text-[10px] font-black border transition-all 
+                        ${selectedDay === ds ? 'bg-blue-600 border-blue-400' : isPast ? 'opacity-10 cursor-not-allowed' : count >= 2 ? 'text-red-500 border-red-900/20' : 'bg-zinc-900 border-white/5'}`
                     }, d));
                 }
-
-                return e('div', { className: "bg-gray-900 rounded-[2.5rem] p-6 border border-white/5 mb-6" },
-                    e('div', { className: "flex justify-between items-center mb-6 px-2" },
-                        e('button', { onClick: () => setCurM(new Date(y, m - 1)), className: "text-lg" }, "←"),
-                        e('b', { className: "uppercase text-[10px] tracking-widest text-blue-400" }, curM.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })),
-                        e('button', { onClick: () => setCurM(new Date(y, m + 1)), className: "text-lg" }, "→")
+                return e('div', { className: "bg-zinc-950 p-4 rounded-3xl border border-white/5 w-full max-w-[280px] mx-auto" },
+                    e('div', { className: "flex justify-between items-center mb-4 px-2" },
+                        e('button', { onClick: () => setCurM(new Date(y, m - 1)) }, "←"),
+                        e('b', { className: "text-[9px] uppercase tracking-widest text-blue-500" }, curM.toLocaleString('uk-UA', {month:'long'})),
+                        e('button', { onClick: () => setCurM(new Date(y, m + 1)) }, "→")
                     ),
-                    e('div', { className: "grid grid-cols-7 gap-2" }, daysElements)
+                    e('div', { className: "grid grid-cols-7 gap-1" }, cells)
                 );
             };
 
-            // Екран входу
-            if (!profile) return e('div', { className: "p-8 bg-black min-h-screen text-white flex flex-col justify-center font-sans" },
-                e('h1', { className: "text-2xl font-black mb-8 text-center uppercase" }, "Вхід"),
-                e('input', { id: "n", placeholder: "Ім'я", className: "p-5 mb-4 bg-gray-900 rounded-[2rem] outline-none" }),
-                e('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-5 mb-8 bg-gray-900 rounded-[2rem] outline-none" }),
+            if (!profile) return e('div', { className: "p-10 bg-black min-h-screen text-white flex flex-col justify-center font-sans" },
+                e('h1', { className: "text-2xl font-black mb-8 text-center" }, "LAUNDRY"),
+                e('input', { id: "n", placeholder: "Ім'я (або Tokyo)", className: "p-4 mb-3 bg-zinc-900 rounded-2xl outline-none" }),
+                e('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-4 mb-8 bg-zinc-900 rounded-2xl outline-none" }),
                 e('button', { 
                     onClick: () => {
                         const n = document.getElementById('n').value.trim(), r = document.getElementById('r').value.trim();
-                        if(n && r) {
-                            const u = {n, r, adm: n.toLowerCase()==='admin' && r==='777'};
+                        if(n) {
+                            const u = {n, r, adm: n.toLowerCase() === 'tokyo'};
                             localStorage.setItem('l_u', JSON.stringify(u));
                             setProfile(u);
                         }
-                    }, className: "bg-blue-600 py-5 rounded-[2rem] font-black uppercase"
+                    }, className: "bg-blue-600 py-4 rounded-2xl font-black uppercase"
                 }, "Увійти")
             );
 
-            // АДМІНКА
             if (profile.adm) {
                 const stats = {};
                 bookings.forEach(b => {
-                    const k = `${b.n.toLowerCase()}_${b.r}`;
+                    const k = `${b.n}_${b.r}`;
                     if(!stats[k]) stats[k] = { n: b.n, r: b.r, dev: b.dev || '?', o: [] };
                     stats[k].o.push(b);
                 });
 
-                return e('div', { className: "p-4 bg-black min-h-screen text-white pb-24" },
-                    e('div', { className: "flex justify-between mb-8 border-b border-white/10 pb-4 text-[10px] font-black uppercase" },
+                return e('div', { className: "p-4 bg-black min-h-screen text-white font-sans" },
+                    e('div', { className: "flex justify-between mb-6 text-[10px] font-black uppercase border-b border-white/5 pb-4" },
                         e('div', { className: "flex gap-4" },
-                            e('button', { onClick: () => setView('active'), className: view==='active'?'text-blue-500':'text-gray-500' }, "Календар"),
-                            e('button', { onClick: () => setView('archive'), className: view==='archive'?'text-blue-500':'text-gray-500' }, "Архів"),
-                            e('button', { onClick: () => setView('stats'), className: view==='stats'?'text-blue-500':'text-gray-500' }, "Статистика")
+                            e('button', { onClick: () => setView('active'), className: view==='active'?'text-blue-500':'' }, "План"),
+                            e('button', { onClick: () => setView('archive'), className: view==='archive'?'text-blue-500':'' }, "Архів"),
+                            e('button', { onClick: () => setView('stats'), className: view==='stats'?'text-blue-500':'' }, "Люди")
                         ),
                         e('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-red-500" }, "Вихід")
                     ),
                     view !== 'stats' ? e(React.Fragment, null,
-                        renderCalendar(setSelD, selD),
-                        e('div', { className: "space-y-3" },
-                            bookings.filter(b => b.d === selD && (view === 'archive' ? b.archived : !b.archived)).map(b => 
-                                e('div', { key: b.id, className: "bg-gray-900 p-5 rounded-[2.5rem] flex justify-between items-center border border-white/5" },
+                        renderCalendar(setSelD, selD, true),
+                        e('div', { className: "mt-6 space-y-2" },
+                            bookings.filter(b => b.d === selD && (view==='archive' ? b.archived : !b.archived)).map(b => 
+                                e('div', { key: b.id, className: "bg-zinc-900 p-4 rounded-2xl flex justify-between items-center" },
                                     e('div', null, 
-                                        e('div', { className: "font-black uppercase text-lg" }, `${b.n} (к.${b.r})`),
-                                        e('div', { className: "text-[9px] text-gray-500 font-bold uppercase" }, `📱 ${b.dev || '?'}`)
+                                        e('div', {className:"font-black uppercase text-sm"}, `${b.n} (${b.r})`),
+                                        e('div', {className:"text-[8px] text-zinc-500 font-bold uppercase"}, `${b.package} | ${b.dev}`)
                                     ),
-                                    e('div', { className: "flex gap-4" },
+                                    e('div', {className:"flex gap-2"},
                                         !b.archived && e('button', { onClick: () => updateDoc(doc(db,'orders',b.id),{archived:true}) }, "✅"),
                                         e('button', { onClick: () => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id)) }, "🗑️")
                                     )
                                 )
                             )
                         )
-                    ) : e('div', { className: "space-y-4" },
+                    ) : e('div', { className: "space-y-2" },
                         Object.values(stats).sort((a,b)=>b.o.length-a.o.length).map(u => 
-                            e('div', { key: u.n+u.r, className: "bg-gray-900 p-6 rounded-[2.5rem]" },
-                                e('div', { className: "flex justify-between" },
-                                    e('div', null, 
-                                        e('b', { className: "uppercase text-xl block" }, u.n),
-                                        e('span', { className: "text-blue-500 text-[10px] font-black uppercase" }, `Кімната ${u.r}`),
-                                        e('p', { className: "text-[9px] text-gray-600 mt-4 font-bold" }, "ПРИСТРІЙ:"),
-                                        e('p', { className: "text-[10px] text-gray-300 font-black" }, u.dev)
-                                    ),
-                                    e('div', { className: "bg-blue-600 text-white px-4 py-2 rounded-2xl text-xs font-black" }, `${u.o.length} прань`)
-                                )
+                            e('div', { key: u.n+u.r, className: "bg-zinc-900 p-4 rounded-2xl flex justify-between" },
+                                e('div', null, e('b', {className:"uppercase text-sm"}, u.n), e('p', {className:"text-[8px] text-zinc-500"}, u.dev)),
+                                e('div', {className:"text-blue-500 font-black text-xs"}, u.o.length)
                             )
                         )
                     )
                 );
             }
 
-            // ЮЗЕР
-            return e('div', { className: "p-8 bg-black min-h-screen text-white flex flex-col font-sans" },
-                e('div', { className: "flex justify-between items-center mb-8" },
-                    e('div', { className: "text-2xl font-black uppercase tracking-tighter" }, `Привіт, ${profile.n}`),
-                    e('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-[10px] text-gray-600 font-black uppercase border border-white/5 px-3 py-1 rounded-full" }, "Вихід")
+            return e('div', { className: "p-6 bg-black min-h-screen text-white font-sans flex flex-col" },
+                e('div', { className: "flex justify-between items-center mb-6" },
+                    e('b', { className: "uppercase tracking-tighter" }, profile.n),
+                    e('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-[8px] text-zinc-600 uppercase border border-white/10 px-3 py-1 rounded-full" }, "Вийти")
                 ),
-                e('p', { className: "text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest" }, "Вибери день у календарі:"),
                 renderCalendar(setSelD, selD),
-                e('div', { className: "mt-auto pt-6" },
+                e('div', { className: "mt-8" },
+                    e('p', { className: "text-[9px] font-black text-zinc-500 uppercase mb-3 text-center" }, "Вага речей:"),
+                    e('div', { className: "flex gap-2 mb-8" },
+                        PKG.map(p => e('button', {
+                            key: p.id, onClick: () => setSelPkg(p.id),
+                            className: `flex-1 py-3 rounded-2xl border transition-all text-[8px] font-black uppercase ${selPkg===p.id?'bg-blue-600 border-blue-400':'bg-zinc-900 border-white/5 text-zinc-500'}`
+                        }, p.label))
+                    ),
                     e('button', { 
                         onClick: async () => {
-                            const isFull = bookings.filter(b => b.d === selD && !b.archived).length >= 2;
-                            if(isFull) return alert("Цей день вже зайнятий!");
+                            if(selD < today) return alert("Минуле закрите");
+                            if(bookings.filter(b=>b.d===selD && !b.archived).length >= 2) return alert("Зайнято");
                             await addDoc(collection(db,'orders'), {
-                                r: profile.r, n: profile.n, d: selD, archived: false,
-                                dev: getFullDev(), createdAt: serverTimestamp()
+                                r: profile.r, n: profile.n, d: selD, package: selPkg, 
+                                archived: false, dev: getFullDev(), createdAt: serverTimestamp()
                             });
-                            alert("Записано!");
-                        }, className: "w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase text-lg shadow-xl shadow-blue-900/20"
+                            alert("Готово!");
+                        }, className: "w-full bg-blue-600 py-5 rounded-[2rem] font-black uppercase text-sm"
                     }, `Записатись на ${selD.split('-').reverse().slice(0,2).join('.')}`)
                 )
             );
@@ -186,7 +185,7 @@
         root.render(e(App));
     </script>
     <style>
-        body { background: black; margin: 0; font-family: system-ui; -webkit-font-smoothing: antialiased; }
+        body { background: black; margin: 0; color: white; -webkit-font-smoothing: antialiased; }
         ::-webkit-scrollbar { display: none; }
     </style>
 </head>
