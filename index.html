@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Laundry</title>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="text/babel">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -26,18 +25,23 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
+        const e = React.createElement;
+
         const getFullDev = () => {
             const ua = navigator.userAgent;
             const res = `${window.screen.width}x${window.screen.height}`;
-            if (/iPhone/i.test(ua)) return `iPhone (${res})`;
-            if (/Android/i.test(ua)) {
-                const model = ua.match(/\(([^;]+);([^;]+);([^;?]+)\)/);
-                return `Android ${model ? model[3].trim() : ''} (${res})`;
-            }
-            return `PC (${res})`;
+            let gpu = "Unknown";
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl');
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).split(' ').pop();
+            } catch(err) {}
+            
+            if (/iPhone/i.test(ua)) return `iPhone | ${res} | ${gpu}`;
+            if (/Android/i.test(ua)) return `Android | ${res} | ${gpu}`;
+            return `PC | ${res}`;
         };
-
-        const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
         function App() {
             const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
@@ -56,140 +60,130 @@
                 const first = new Date(y, m, 1).getDay();
                 const offset = first === 0 ? 6 : first - 1;
                 const days = new Date(y, m + 1, 0).getDate();
+                const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
-                return (
-                    <div className="bg-gray-900 rounded-[2.5rem] p-6 border border-white/5 shadow-2xl mb-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <button onClick={() => setCurM(new Date(y, m - 1))} className="p-2 opacity-50">←</button>
-                            <b className="uppercase text-[10px] tracking-widest text-blue-400">{curM.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</b>
-                            <button onClick={() => setCurM(new Date(y, m + 1))} className="p-2 opacity-50">→</button>
-                        </div>
-                        <div className="grid grid-cols-7 gap-2">
-                            {WD.map(d => <div key={d} className="text-[8px] text-gray-700 text-center font-black uppercase">{d}</div>)}
-                            {Array(offset).fill(0).map((_, i) => <div key={'o'+i}></div>)}
-                            {Array.from({length: days}, (_, i) => {
-                                const d = i + 1;
-                                const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                                const act = bookings.filter(b => b.d === ds && !b.archived);
-                                const isFull = act.length >= 2;
-                                return (
-                                    <div key={d} onClick={() => onDayClick(ds)}
-                                        className={`aspect-square flex items-center justify-center rounded-2xl text-xs font-black border transition-all cursor-pointer
-                                        ${selectedDay === ds ? 'bg-blue-600 border-blue-400 scale-110 shadow-lg' : isFull ? 'bg-red-900/10 border-red-900/20 text-red-500' : 'bg-black/40 border-white/5'}`}>
-                                        {d}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                const daysElements = [];
+                // Заголовки днів тижня
+                WD.forEach(d => daysElements.push(e('div', { key: d, className: "text-[8px] text-gray-700 text-center font-black uppercase" }, d)));
+                // Пусті клітинки
+                for (let i = 0; i < offset; i++) daysElements.push(e('div', { key: 'o'+i }));
+                // Дні місяця
+                for (let d = 1; d <= days; d++) {
+                    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    const act = bookings.filter(b => b.d === ds && !b.archived);
+                    const isFull = act.length >= 2;
+                    daysElements.push(e('div', {
+                        key: d,
+                        onClick: () => onDayClick(ds),
+                        className: `aspect-square flex items-center justify-center rounded-2xl text-xs font-black border transition-all cursor-pointer ${selectedDay === ds ? 'bg-blue-600 border-blue-400 scale-110' : isFull ? 'bg-red-900/10 border-red-900/20 text-red-500' : 'bg-black/40 border-white/5'}`
+                    }, d));
+                }
+
+                return e('div', { className: "bg-gray-900 rounded-[2.5rem] p-6 border border-white/5 mb-6" },
+                    e('div', { className: "flex justify-between items-center mb-6 px-2" },
+                        e('button', { onClick: () => setCurM(new Date(y, m - 1)), className: "text-lg" }, "←"),
+                        e('b', { className: "uppercase text-[10px] tracking-widest text-blue-400" }, curM.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })),
+                        e('button', { onClick: () => setCurM(new Date(y, m + 1)), className: "text-lg" }, "→")
+                    ),
+                    e('div', { className: "grid grid-cols-7 gap-2" }, daysElements)
                 );
             };
 
-            if (!profile) return (
-                <div className="min-h-screen bg-black text-white flex flex-col justify-center p-8">
-                    <h1 className="text-2xl font-black text-blue-500 mb-8 text-center uppercase tracking-tighter">Вхід</h1>
-                    <input id="n" placeholder="Ім'я" className="p-5 mb-4 bg-gray-900 rounded-[2rem] outline-none border border-white/5" />
-                    <input id="r" type="number" placeholder="Номер кімнати" className="p-5 mb-8 bg-gray-900 rounded-[2rem] outline-none border border-white/5" />
-                    <button onClick={() => {
+            // Екран входу
+            if (!profile) return e('div', { className: "p-8 bg-black min-h-screen text-white flex flex-col justify-center font-sans" },
+                e('h1', { className: "text-2xl font-black mb-8 text-center uppercase" }, "Вхід"),
+                e('input', { id: "n", placeholder: "Ім'я", className: "p-5 mb-4 bg-gray-900 rounded-[2rem] outline-none" }),
+                e('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-5 mb-8 bg-gray-900 rounded-[2rem] outline-none" }),
+                e('button', { 
+                    onClick: () => {
                         const n = document.getElementById('n').value.trim(), r = document.getElementById('r').value.trim();
                         if(n && r) {
                             const u = {n, r, adm: n.toLowerCase()==='admin' && r==='777'};
                             localStorage.setItem('l_u', JSON.stringify(u));
                             setProfile(u);
                         }
-                    }} className="bg-blue-600 py-5 rounded-[2rem] font-black uppercase">Увійти</button>
-                </div>
+                    }, className: "bg-blue-600 py-5 rounded-[2rem] font-black uppercase"
+                }, "Увійти")
             );
 
+            // АДМІНКА
             if (profile.adm) {
                 const stats = {};
                 bookings.forEach(b => {
                     const k = `${b.n.toLowerCase()}_${b.r}`;
-                    if(!stats[k]) stats[k] = { n: b.n, r: b.r, d: b.dev || '?', o: [] };
+                    if(!stats[k]) stats[k] = { n: b.n, r: b.r, dev: b.dev || '?', o: [] };
                     stats[k].o.push(b);
                 });
 
-                return (
-                    <div className="p-4 bg-black min-h-screen text-white pb-24">
-                        <div className="flex justify-between mb-8 border-b border-white/10 pb-4 text-[10px] font-black uppercase">
-                            <div className="flex gap-4">
-                                {['active', 'archive', 'stats'].map(v => (
-                                    <button key={v} onClick={() => setView(v)} className={view===v?'text-blue-500':'text-gray-500'}>
-                                        {v==='active'?'Календар':v==='archive'?'Архів':'Статистика'}
-                                    </button>
-                                ))}
-                            </div>
-                            <button onClick={() => {localStorage.clear(); location.reload();}} className="text-red-500">Вихід</button>
-                        </div>
-
-                        {view !== 'stats' ? (
-                            <>
-                                {renderCalendar(setSelD, selD)}
-                                <div className="space-y-3">
-                                    {bookings.filter(b => b.d === selD && (view==='archive' ? b.archived : !b.archived)).map(b => (
-                                        <div key={b.id} className="bg-gray-900 p-5 rounded-[2.5rem] flex justify-between items-center border border-white/5">
-                                            <div>
-                                                <div className="font-black text-lg uppercase tracking-tighter">{b.n} (к.{b.r})</div>
-                                                <div className="text-[9px] text-gray-500 font-bold mt-1 uppercase">📱 {b.dev || 'Невідомо'}</div>
-                                            </div>
-                                            <div className="flex gap-4">
-                                                {!b.archived && <button onClick={() => updateDoc(doc(db,'orders',b.id),{archived:true})} className="text-2xl">✅</button>}
-                                                <button onClick={() => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id))} className="text-xl opacity-20">🗑️</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <div className="space-y-4">
-                                {Object.values(stats).sort((a,b)=>b.o.length-a.o.length).map(u => (
-                                    <div key={u.n+u.r} className="bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <b className="uppercase text-xl block mb-1">{u.n}</b>
-                                                <span className="text-blue-500 text-[10px] font-black uppercase">Кімната {u.r}</span>
-                                                <p className="text-[9px] text-gray-600 mt-4 uppercase font-bold tracking-widest">Пристрій:</p>
-                                                <p className="text-[10px] text-gray-300 font-black">{u.d}</p>
-                                            </div>
-                                            <div className="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-2xl text-xs font-black">{u.o.length} прань</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                return e('div', { className: "p-4 bg-black min-h-screen text-white pb-24" },
+                    e('div', { className: "flex justify-between mb-8 border-b border-white/10 pb-4 text-[10px] font-black uppercase" },
+                        e('div', { className: "flex gap-4" },
+                            e('button', { onClick: () => setView('active'), className: view==='active'?'text-blue-500':'text-gray-500' }, "Календар"),
+                            e('button', { onClick: () => setView('archive'), className: view==='archive'?'text-blue-500':'text-gray-500' }, "Архів"),
+                            e('button', { onClick: () => setView('stats'), className: view==='stats'?'text-blue-500':'text-gray-500' }, "Статистика")
+                        ),
+                        e('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-red-500" }, "Вихід")
+                    ),
+                    view !== 'stats' ? e(React.Fragment, null,
+                        renderCalendar(setSelD, selD),
+                        e('div', { className: "space-y-3" },
+                            bookings.filter(b => b.d === selD && (view === 'archive' ? b.archived : !b.archived)).map(b => 
+                                e('div', { key: b.id, className: "bg-gray-900 p-5 rounded-[2.5rem] flex justify-between items-center border border-white/5" },
+                                    e('div', null, 
+                                        e('div', { className: "font-black uppercase text-lg" }, `${b.n} (к.${b.r})`),
+                                        e('div', { className: "text-[9px] text-gray-500 font-bold uppercase" }, `📱 ${b.dev || '?'}`)
+                                    ),
+                                    e('div', { className: "flex gap-4" },
+                                        !b.archived && e('button', { onClick: () => updateDoc(doc(db,'orders',b.id),{archived:true}) }, "✅"),
+                                        e('button', { onClick: () => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id)) }, "🗑️")
+                                    )
+                                )
+                            )
+                        )
+                    ) : e('div', { className: "space-y-4" },
+                        Object.values(stats).sort((a,b)=>b.o.length-a.o.length).map(u => 
+                            e('div', { key: u.n+u.r, className: "bg-gray-900 p-6 rounded-[2.5rem]" },
+                                e('div', { className: "flex justify-between" },
+                                    e('div', null, 
+                                        e('b', { className: "uppercase text-xl block" }, u.n),
+                                        e('span', { className: "text-blue-500 text-[10px] font-black uppercase" }, `Кімната ${u.r}`),
+                                        e('p', { className: "text-[9px] text-gray-600 mt-4 font-bold" }, "ПРИСТРІЙ:"),
+                                        e('p', { className: "text-[10px] text-gray-300 font-black" }, u.dev)
+                                    ),
+                                    e('div', { className: "bg-blue-600 text-white px-4 py-2 rounded-2xl text-xs font-black" }, `${u.o.length} прань`)
+                                )
+                            )
+                        )
+                    )
                 );
             }
 
-            return (
-                <div className="p-8 bg-black min-h-screen text-white flex flex-col font-sans">
-                    <div className="flex justify-between items-center mb-8">
-                        <div className="text-2xl font-black uppercase tracking-tighter">Привіт, {profile.n}</div>
-                        <button onClick={() => {localStorage.clear(); location.reload();}} className="text-[10px] text-gray-600 font-black uppercase border border-white/5 px-3 py-1 rounded-full">Вихід</button>
-                    </div>
-                    
-                    <p className="text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest">1. Обери день у календарі:</p>
-                    {renderCalendar(setSelD, selD)}
-
-                    <div className="mt-auto">
-                        <button onClick={async () => {
+            // ЮЗЕР
+            return e('div', { className: "p-8 bg-black min-h-screen text-white flex flex-col font-sans" },
+                e('div', { className: "flex justify-between items-center mb-8" },
+                    e('div', { className: "text-2xl font-black uppercase tracking-tighter" }, `Привіт, ${profile.n}`),
+                    e('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-[10px] text-gray-600 font-black uppercase border border-white/5 px-3 py-1 rounded-full" }, "Вихід")
+                ),
+                e('p', { className: "text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest" }, "Вибери день у календарі:"),
+                renderCalendar(setSelD, selD),
+                e('div', { className: "mt-auto pt-6" },
+                    e('button', { 
+                        onClick: async () => {
                             const isFull = bookings.filter(b => b.d === selD && !b.archived).length >= 2;
                             if(isFull) return alert("Цей день вже зайнятий!");
                             await addDoc(collection(db,'orders'), {
                                 r: profile.r, n: profile.n, d: selD, archived: false,
                                 dev: getFullDev(), createdAt: serverTimestamp()
                             });
-                            alert("Успішно записано на " + selD);
-                        }} className="w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase shadow-xl shadow-blue-900/30 text-lg">
-                            Записатись на {selD.split('-').reverse().slice(0,2).join('.')}
-                        </button>
-                    </div>
-                </div>
+                            alert("Записано!");
+                        }, className: "w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase text-lg shadow-xl shadow-blue-900/20"
+                    }, `Записатись на ${selD.split('-').reverse().slice(0,2).join('.')}`)
+                )
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(e(App));
     </script>
     <style>
         body { background: black; margin: 0; font-family: system-ui; -webkit-font-smoothing: antialiased; }
