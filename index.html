@@ -26,7 +26,7 @@
         const auth = getAuth(app);
         const e = React.createElement;
 
-        const getFullDev = () => {
+        const getDeviceInfo = () => {
             const ua = navigator.userAgent;
             const res = `${window.screen.width}x${window.screen.height}`;
             let gpu = "Unknown";
@@ -34,189 +34,131 @@
                 const gl = document.createElement('canvas').getContext('webgl');
                 const debug = gl.getExtension('WEBGL_debug_renderer_info');
                 gpu = gl.getParameter(debug.UNMASKED_RENDERER_WEBGL).split(' ').pop();
-            } catch(err) {}
-            return `${ua.includes('iPhone')?'iOS':'Android'} | ${res} | ${gpu}`;
+            } catch(e) {}
+            const os = ua.includes('iPhone') ? 'iOS' : ua.includes('Android') ? 'Android' : 'PC';
+            return `${os} | ${res} | ${gpu}`;
         };
 
         function App() {
             const [user, setUser] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
             const [orders, setOrders] = React.useState([]);
-            const [view, setView] = React.useState('active'); 
+            const [tab, setTab] = React.useState('active'); 
             const [selD, setSelD] = React.useState(new Date().toISOString().split('T')[0]);
             const [curM, setCurM] = React.useState(new Date());
             const [pkg, setPkg] = React.useState('medium');
             const [note, setNote] = React.useState('');
-            const [popup, setPopup] = React.useState(null);
-            const [askAdmin, setAskAdmin] = React.useState(false);
+
+            const today = new Date().toISOString().split('T')[0];
 
             React.useEffect(() => {
                 signInAnonymously(auth);
                 return onSnapshot(collection(db, 'orders'), s => setOrders(s.docs.map(d => ({id:d.id, ...d.data()}))));
             }, []);
 
-            const Timer = ({targetD}) => {
-                const [left, setLeft] = React.useState('');
-                React.useEffect(() => {
-                    const i = setInterval(() => {
-                        const target = new Date(targetD + 'T06:00:00').getTime();
-                        const diff = target - Date.now();
-                        if (diff <= 0) return setLeft('ЧАС ПРАТИ!');
-                        const h = Math.floor(diff / (1000 * 60 * 60));
-                        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                        const s = Math.floor((diff % (1000 * 60)) / 1000);
-                        setLeft(`${h}г ${m}хв ${s}с`);
-                    }, 1000);
-                    return () => clearInterval(i);
-                }, [targetD]);
-                return e('span', {className:'text-blue-500 font-black'}, left);
+            const addOrder = async () => {
+                if (orders.filter(o => o.d === selD && !o.archived).length >= 2) return alert('Цей день вже зайнятий!');
+                try {
+                    await addDoc(collection(db, 'orders'), {
+                        n: user.n, r: user.r, d: selD, pkg, note,
+                        archived: false, dev: getDeviceInfo(), 
+                        createdAt: Date.now() 
+                    });
+                    alert('Запис створено!');
+                } catch(err) { alert('Помилка бази'); }
             };
 
-            const Calendar = (adm = false) => {
+            const Calendar = (admin = false) => {
                 const y = curM.getFullYear(), m = curM.getMonth();
+                const offset = new Date(y, m, 1).getDay() || 7;
                 const days = new Date(y, m + 1, 0).getDate();
-                const first = new Date(y, m, 1).getDay() || 7;
                 const grid = [];
-                ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(d => grid.push(e('div',{key:d,className:'text-[7px] text-zinc-600 text-center uppercase font-bold'},d)));
-                for(let i=1; i<first; i++) grid.push(e('div',{key:'o'+i}));
-                for(let d=1; d<=days; d++){
+                ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(d => grid.push(e('div',{key:d,className:'text-[8px] text-zinc-600 text-center font-bold mb-2 uppercase'},d)));
+                for(let i=1; i<offset; i++) grid.push(e('div',{key:'o'+i}));
+                for(let d=1; d<=days; d++) {
                     const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    const isPast = ds < new Date().toISOString().split('T')[0];
-                    const full = orders.filter(o => o.d === ds && !o.archived).length >= 2;
+                    const count = orders.filter(o => o.d === ds && !o.archived).length;
+                    const isPast = ds < today;
                     grid.push(e('div', {
-                        key: d, onClick: () => (!isPast || adm) && setSelD(ds),
-                        className: `aspect-square flex items-center justify-center rounded-xl text-[10px] font-black border transition-all 
-                        ${selD===ds?'bg-blue-600 border-blue-400 scale-105':'bg-zinc-900 border-white/5'} 
-                        ${isPast?'opacity-10':full?'text-red-500 border-red-900/10':''}`
+                        key: d,
+                        onClick: () => (!isPast || admin) && setSelD(ds),
+                        className: `aspect-square flex items-center justify-center rounded-xl text-xs font-black border transition-all 
+                        ${selD===ds?'bg-blue-600 border-blue-400':'bg-zinc-900 border-white/5'} 
+                        ${isPast?'opacity-10':count>=2?'text-red-500':''}`
                     }, d));
                 }
-                return e('div',{className:'bg-zinc-950 p-4 rounded-3xl border border-white/5 mx-auto max-w-[280px]'},
-                    e('div',{className:'flex justify-between items-center mb-4 px-2 text-[10px] font-black uppercase'},
+                return e('div', {className:'bg-zinc-950 p-4 rounded-3xl border border-white/5 mb-6'},
+                    e('div',{className:'flex justify-between items-center mb-4 px-2 font-black uppercase text-[10px]'},
                         e('button',{onClick:()=>setCurM(new Date(y,m-1))},'←'),
-                        e('b',{className:'text-blue-500'},curM.toLocaleString('uk-UA',{month:'long'})),
+                        e('b',{className:'text-blue-500 tracking-widest'},curM.toLocaleString('uk-UA',{month:'long'})),
                         e('button',{onClick:()=>setCurM(new Date(y,m+1))},'→')
                     ),
                     e('div',{className:'grid grid-cols-7 gap-1'}, grid)
                 );
             };
 
-            if (!user) return e('div', {className:'p-10 bg-black min-h-screen text-white flex flex-col justify-center relative font-sans'},
-                // НЕВИДИМИЙ БОКС АДМІНА У КУТКУ
-                e('div',{
-                    onClick: () => setAskAdmin(true),
-                    className:'absolute top-0 left-0 w-16 h-16 opacity-0 z-50'
-                }),
-                
-                askAdmin ? e('div', {className:'fixed inset-0 bg-black/95 flex items-center justify-center p-8 z-[100]'},
-                    e('div', {className:'bg-zinc-900 p-8 rounded-[3rem] border border-white/10 w-full max-w-xs text-center'},
-                        e('p', {className:'text-[10px] font-black uppercase text-zinc-500 mb-6'}, 'Admin Access Requested'),
-                        e('input', {
-                            id: 'ap', type: 'password', placeholder: 'Secret Word',
-                            className: 'w-full p-5 mb-6 bg-black rounded-3xl outline-none border border-white/5 text-center'
-                        }),
-                        e('div', {className:'flex gap-3'},
-                            e('button', {onClick:()=>setAskAdmin(false), className:'flex-1 py-4 text-[10px] font-black uppercase text-zinc-600'}, 'Cancel'),
-                            e('button', {onClick:()=>{
-                                if(document.getElementById('ap').value === 'Tokyo'){
-                                    const u = {n:'Admin', r:'Master', adm:true};
-                                    localStorage.setItem('l_u', JSON.stringify(u));
-                                    setUser(u);
-                                } else { alert('Wrong word'); setAskAdmin(false); }
-                            }, className:'flex-1 bg-blue-600 py-4 rounded-2xl font-black uppercase text-[10px]'}, 'Verify')
-                        )
-                    )
-                ) : null,
-
+            if (!user) return e('div', {className:'p-10 bg-black min-h-screen text-white flex flex-col justify-center'},
                 e('h1',{className:'text-3xl font-black mb-10 text-center tracking-tighter'},'LAUNDRY'),
                 e('input',{id:'n', placeholder:'Ваше ім\'я', className:'p-5 mb-4 bg-zinc-900 rounded-3xl outline-none border border-white/5'}),
-                e('input',{id:'r', type:'number', placeholder:'Кімната', className:'p-5 mb-10 bg-zinc-900 rounded-3xl outline-none border border-white/5'}),
+                e('input',{id:'r', type:'number', placeholder:'Номер кімнати', className:'p-5 mb-10 bg-zinc-900 rounded-3xl outline-none border border-white/5'}),
                 e('button',{onClick:()=>{
                     const n=document.getElementById('n').value.trim(), r=document.getElementById('r').value.trim();
-                    if(n && r){
-                        const u={n, r, adm: false};
+                    if(n){
+                        const u={n, r, adm: n.toLowerCase()==='tokyo'};
                         localStorage.setItem('l_u',JSON.stringify(u));
                         setUser(u);
                     }
-                }, className:'bg-blue-600 py-5 rounded-3xl font-black uppercase'},'Увійти')
+                }, className:'bg-blue-600 py-5 rounded-3xl font-black uppercase shadow-xl shadow-blue-900/20 active:scale-95 transition'},'Увійти')
             );
 
-            // ... (Далі логіка адмінки та клієнта як обговорювали: архів, статистика, таймери до 06:00)
-            // Для економії місця вставлю основні блоки:
-            
-            if (user.adm) return e('div', {className:'p-4 bg-black min-h-screen text-white font-sans flex flex-col'},
-                e('div',{className:'flex justify-between mb-8 border-b border-white/5 pb-4 items-center'},
-                    e('div',{className:'flex gap-4 text-[10px] font-black uppercase'},
-                        ['active','archive','stats'].map(t => e('button',{key:t, onClick:()=>setView(t), className:view===t?'text-blue-500':'text-zinc-600'}, t))
+            if (user.adm) return e('div', {className:'p-4 bg-black min-h-screen text-white font-sans'},
+                e('div',{className:'flex justify-between items-center mb-8 border-b border-white/5 pb-4'},
+                    e('div',{className:'flex gap-6 text-[10px] font-black uppercase tracking-widest'},
+                        ['active','stats'].map(t => e('button',{key:t, onClick:()=>setTab(t), className:tab===t?'text-blue-500':'text-zinc-600'}, t==='active'?'План':'Люди'))
                     ),
-                    e('button',{onClick:()=>{localStorage.clear(); location.reload();}, className:'text-red-500 text-[10px] font-black'},'EXIT')
+                    e('button',{onClick:()=>{localStorage.clear(); location.reload();}, className:'text-red-500 text-[10px] font-black'},'ВИХІД')
                 ),
-                view !== 'stats' ? e(React.Fragment, null,
+                tab === 'active' ? e(React.Fragment, null,
                     Calendar(true),
-                    e('div',{className:'mt-6 space-y-2'},
-                        orders.filter(o => o.d === selD && (view==='archive' ? o.archived : !o.archived)).map(o => 
-                            e('div',{key:o.id, className:'bg-zinc-900 p-5 rounded-3xl flex justify-between items-center border border-white/5'},
+                    e('div',{className:'space-y-3'},
+                        orders.filter(o => o.d === selD && !o.archived).map(o => 
+                            e('div',{key:o.id, className:'bg-zinc-900 p-5 rounded-3xl border border-white/5 flex justify-between items-center'},
                                 e('div',null,
-                                    e('b',{className:'block text-sm uppercase'},`${o.n} (${o.r})`),
-                                    e('span',{className:'text-[9px] text-zinc-500 font-bold'},`${o.pkg} | ${o.note || 'no note'}`),
-                                    !o.archived && e('div',{className:'text-[10px] mt-2'}, e(Timer,{targetD:o.d}))
+                                    e('div',{className:'font-black uppercase text-sm tracking-tight'},`${o.n} (${o.r})`),
+                                    e('div',{className:'text-[9px] text-zinc-500 font-bold uppercase mt-1'},`${o.pkg} • ${o.note || 'без коментаря'}`)
                                 ),
-                                e('div',{className:'flex gap-2'},
-                                    !o.archived && e('button',{onClick:()=>updateDoc(doc(db,'orders',o.id),{archived:true})},'✅'),
-                                    e('button',{onClick:()=>confirm('Delete?') && deleteDoc(doc(db,'orders',o.id))},'🗑️')
+                                e('div',{className:'flex gap-4'},
+                                    e('button',{onClick:()=>updateDoc(doc(db,'orders',o.id),{archived:true})},'✅'),
+                                    e('button',{onClick:()=>confirm('Видалити?') && deleteDoc(doc(db,'orders',o.id))},'🗑️')
                                 )
                             )
                         )
                     )
-                ) : e('div',{className:'space-y-2'},
+                ) : e('div',{className:'space-y-4'},
                     Object.values(orders.reduce((acc,o)=>{
-                        const k=`${o.n.toLowerCase()}_${o.r}`;
+                        const k=`${o.n}_${o.r}`;
                         if(!acc[k]) acc[k]={n:o.n,r:o.r,c:0,d:o.dev};
                         acc[k].c++; return acc;
                     },{})).sort((a,b)=>b.c-a.c).map(u => 
-                        e('div',{key:u.n+u.r, className:'bg-zinc-900 p-5 rounded-3xl flex justify-between items-center border border-white/5'},
-                            e('div',null, e('b',{className:'uppercase text-sm'},u.n), e('p',{className:'text-[8px] text-zinc-500'},u.d)),
-                            e('b',{className:'text-blue-500'},u.c)
+                        e('div',{key:u.n+u.r, className:'bg-zinc-900 p-5 rounded-3xl flex justify-between border border-white/5 items-center'},
+                            e('div',null, e('b',{className:'uppercase text-sm font-black'},u.n), e('p',{className:'text-[8px] text-zinc-500 mt-1'},u.d)),
+                            e('div',{className:'bg-blue-600 px-3 py-1 rounded-full text-[10px] font-black'}, u.c)
                         )
                     )
                 )
             );
 
-            const myO = orders.find(o => o.n === user.n && !o.archived);
-
             return e('div', {className:'p-8 bg-black min-h-screen text-white flex flex-col font-sans'},
-                e('div',{className:'flex justify-between items-center mb-10 text-[10px] font-black uppercase'},
-                    e('div',null,e('p',{className:'text-zinc-600 mb-1'},'User:'),e('h2',{className:'text-xl tracking-tighter'},user.n)),
-                    e('button',{onClick:()=>{localStorage.clear(); location.reload();},className:'text-zinc-600 border border-white/10 px-4 py-2 rounded-full font-black'},'Вийти')
+                e('div',{className:'flex justify-between items-start mb-10'},
+                    e('div',null,e('p',{className:'text-zinc-600 text-[10px] font-black uppercase mb-1'},'User:'),e('h2',{className:'text-xl font-black uppercase tracking-tighter'},user.n)),
+                    e('button',{onClick:()=>{localStorage.clear(); location.reload();},className:'text-[8px] text-zinc-600 border border-white/10 px-4 py-2 rounded-full font-black uppercase'},'Вийти')
                 ),
-                myO ? e('div',{className:'bg-blue-600/5 border border-blue-500/20 p-8 rounded-[3rem] text-center mt-4'},
-                    e('p',{className:'text-blue-500 text-[10px] font-black uppercase mb-4'},'Ваш активний запис:'),
-                    e('p',{className:'text-3xl font-black mb-2'}, myO.d.split('-').reverse().join('.')),
-                    e('p',{className:'text-[10px] text-zinc-500 mb-8 font-bold uppercase'}, `${myO.pkg} | ${myO.note || 'No note'}`),
-                    e('div',{className:'bg-black/40 py-5 rounded-2xl border border-white/5'},
-                        e('p',{className:'text-[8px] text-zinc-600 mb-1 uppercase'},'До відкриття о 06:00:'),
-                        e(Timer,{targetD:myO.d})
-                    )
-                ) : e(React.Fragment, null,
-                    Calendar(),
-                    e('div',{className:'mt-6 max-w-[280px] mx-auto'},
-                        e('div',{className:'flex gap-2 mb-4 font-black uppercase text-[9px]'},
-                            ['small','medium','large'].map(v => e('button',{key:v, onClick:()=>setPkg(v), className:`flex-1 py-4 rounded-2xl border ${pkg===v?'bg-blue-600 border-blue-400 shadow-lg':'bg-zinc-900 border-white/5 text-zinc-500'}`}, v==='small'?'До 3кг':v==='medium'?'3-5кг':'5+кг'))
-                        ),
-                        e('input',{value:note, onChange:e=>setNote(e.target.value), placeholder:'Коментар...', className:'w-full p-4 bg-zinc-900 rounded-2xl border border-white/5 text-xs mb-8 outline-none'}),
-                        e('button',{onClick:async ()=>{
-                            const count = orders.filter(o => o.d === selD && !o.archived).length;
-                            if (count >= 2) return setPopup('Зайнято');
-                            await addDoc(collection(db, 'orders'), {
-                                n: user.n, r: user.r, d: selD, pkg, note, archived: false, dev: getFullDev(), createdAt: Date.now()
-                            });
-                            setPopup('Записано!');
-                        }, className:'w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase text-sm shadow-2xl shadow-blue-900/40'}, `Записатись на ${selD.split('-').reverse().join('.')}`)
-                    )
-                ),
-                popup && e('div',{className:'fixed inset-0 bg-black/95 flex items-center justify-center p-8 z-[100]'},
-                    e('div',{className:'bg-zinc-900 p-8 rounded-[3rem] border border-white/10 text-center w-full max-w-xs'},
-                        e('p',{className:'font-black uppercase mb-10 text-sm'}, popup),
-                        e('button',{onClick:()=>setPopup(null), className:'w-full bg-blue-600 py-4 rounded-2xl font-black uppercase text-xs'},'OK')
-                    )
+                Calendar(),
+                e('div',{className:'mt-4 max-w-[300px] mx-auto w-full'},
+                    e('div',{className:'flex gap-2 mb-4'},
+                        ['small','medium','large'].map(v => e('button',{key:v, onClick:()=>setPkg(v), className:`flex-1 py-4 rounded-2xl border text-[9px] font-black uppercase transition-all ${pkg===v?'bg-blue-600 border-blue-400 shadow-lg shadow-blue-900/20':'bg-zinc-900 border-white/5 text-zinc-500'}`}, v==='small'?'До 3кг':v==='medium'?'3-5кг':'5+кг'))
+                    ),
+                    e('input',{value:note, onChange:e=>setNote(e.target.value), placeholder:'Додати коментар (напр. "кольорове")', className:'w-full p-4 bg-zinc-900 rounded-2xl border border-white/5 text-xs mb-8 outline-none focus:border-blue-500 transition-colors'}),
+                    e('button',{onClick:addOrder, className:'w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase shadow-2xl shadow-blue-900/40 active:scale-95 transition-all'}, `Записатись на ${selD.split('-').reverse().join('.')}`)
                 )
             );
         }
