@@ -26,9 +26,9 @@
         const auth = getAuth(app);
         
         const PKG = { 
-            small: { n: 'До 5 кг речей', d: 24 }, 
-            medium: { n: '5 - 10 кг речей', d: 48 }, 
-            large: { n: 'Більше 10 кг речей', d: 72 } 
+            small: { n: 'До 3 кг речей', d: 24 }, 
+            medium: { n: '3 - 5 кг речей', d: 48 }, 
+            large: { n: '5+ кг (Великий пакет)', d: 72 } 
         };
         const WD = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
@@ -90,7 +90,6 @@
             };
 
             if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans relative" },
-                // НЕВИДИМИЙ БОКС У КУТКУ
                 React.createElement('div', { 
                     onClick: () => { 
                         const p = prompt('Password?'); 
@@ -100,7 +99,7 @@
                             setProfile(a); 
                         } 
                     }, 
-                    className: "absolute top-0 right-0 w-20 h-20 z-50 opacity-0" // Повністю невидимий
+                    className: "absolute top-0 right-0 w-20 h-20 z-50 opacity-0" 
                 }),
                 React.createElement('h1', { className: "text-2xl font-black text-blue-500 mb-8 text-center uppercase" }, "Авторизація"),
                 React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-gray-900 rounded-2xl outline-none" }),
@@ -119,10 +118,10 @@
                 return React.createElement('div', { className: "p-4 bg-black min-h-screen text-white font-sans" },
                     React.createElement('div', { className: "flex justify-between mb-6 items-center border-b border-white/5 pb-4" }, 
                         React.createElement('div', null,
-                            React.createElement('b', {className:"text-yellow-500 text-lg font-black uppercase block"}, view === 'active' ? "Адмін" : "Архів"),
-                            React.createElement('button', {onClick:()=>setView(view==='active'?'archive':'active'), className:"text-[9px] text-blue-500 font-black uppercase tracking-widest mt-1"}, view==='active'?'Архів':'Активні')
+                            React.createElement('b', {className:"text-yellow-500 text-lg font-black uppercase block font-bold"}, view === 'active' ? "Адмін" : "Архів"),
+                            React.createElement('button', {onClick:()=>setView(view==='active'?'archive':'active'), className:"text-[9px] text-blue-500 font-black uppercase tracking-widest mt-1 font-bold"}, view==='active'?'Архів':'Активні')
                         ),
-                        React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-red-500 text-[10px] font-black uppercase"}, "Вихід")
+                        React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-red-500 text-[10px] font-black uppercase font-bold"}, "Вихід")
                     ),
                     React.createElement('div', { className: "flex gap-2 mb-8 overflow-x-auto pb-4 scrollbar-hide" }, Array.from({length:30}, (_,i)=>{
                         const d = new Date(); 
@@ -148,20 +147,20 @@
                         const t = getOrderTimers(b);
                         return React.createElement('div', { key: b.id, className: "bg-gray-900/50 p-6 mb-4 rounded-3xl border border-gray-800" },
                             React.createElement('div', { className: "flex justify-between mb-4" },
-                                React.createElement('div', null, React.createElement('div', {className:"font-black text-xl leading-none uppercase"}, `${b.r} — ${b.n}`), React.createElement('div', {className:"text-blue-400 text-[10px] font-black uppercase mt-1"}, PKG[b.package]?.n)),
+                                React.createElement('div', null, React.createElement('div', {className:"font-black text-xl leading-none uppercase font-bold"}, `${b.r} — ${b.n}`), React.createElement('div', {className:"text-blue-400 text-[10px] font-black uppercase mt-1 font-bold"}, PKG[b.package]?.n)),
                                 React.createElement('div', {className:"flex gap-4"},
-                                    React.createElement('button', {onClick:()=>confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id)), className:"text-xl opacity-50"}, "🗑️"),
-                                    !b.archived && React.createElement('button', {onClick:()=>confirm('В архів?') && updateDoc(doc(db,'orders',b.id), {archived: true}), className:"text-xl opacity-50"}, "📥")
+                                    React.createElement('button', {onClick:()=>confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id)), className:"text-xl opacity-50 font-bold"}, "🗑️"),
+                                    !b.archived && React.createElement('button', {onClick:()=>confirm('В архів?') && updateDoc(doc(db,'orders',b.id), {archived: true}), className:"text-xl opacity-50 font-bold"}, "📥")
                                 )
                             ),
                             !b.archived && React.createElement('div', {className:"relative mb-4"},
                                 React.createElement('textarea', { id: `n-${b.id}`, defaultValue: b.note || "", placeholder: "Коментар...", className: "w-full bg-black border border-white/5 rounded-2xl p-4 text-xs min-h-[80px] outline-none" }),
-                                React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {note: document.getElementById(`n-${b.id}`).value}), className: "absolute bottom-3 right-3 bg-blue-600 p-2 rounded-lg text-[8px] font-black" }, "SAVE")
+                                React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {note: document.getElementById(`n-${b.id}`).value}), className: "absolute bottom-3 right-3 bg-blue-600 p-2 rounded-lg text-[8px] font-black font-bold" }, "SAVE")
                             ),
                             !b.confirmed && !b.archived ? React.createElement('button', {
                                 onClick: () => updateDoc(doc(db,'orders',b.id), {confirmed: true}),
-                                className:"w-full bg-blue-600 py-4 rounded-2xl text-[10px] font-black uppercase"
-                            }, "Підтвердити") : React.createElement('div', {className:`${t.color} font-black text-[10px] uppercase`}, b.archived ? "В АРХІВІ" : `${t.label}: ${t.time}`)
+                                className:"w-full bg-blue-600 py-4 rounded-2xl text-[10px] font-black uppercase font-bold"
+                            }, "Підтвердити") : React.createElement('div', {className:`${t.color} font-black text-[10px] uppercase font-bold`}, b.archived ? "В АРХІВІ" : `${t.label}: ${t.time}`)
                         );
                     })
                 );
@@ -173,59 +172,75 @@
             return React.createElement('div', { className: "min-h-screen bg-black text-white pb-10 font-sans" },
                 React.createElement('header', { className: "p-6 flex justify-between items-center sticky top-0 bg-black/80 backdrop-blur-md z-50 border-b border-white/5" },
                     React.createElement('div', null,
-                        React.createElement('b', {className:"text-blue-500 text-xl font-black uppercase tracking-tighter"}, profile.n),
+                        React.createElement('b', {className:"text-blue-500 text-xl font-black uppercase tracking-tighter font-bold"}, profile.n),
                         React.createElement('div', {className:"flex gap-4 mt-2 font-bold"},
-                            React.createElement('button', {onClick:()=>setView('active'), className:`text-[10px] font-black uppercase ${view==='active'?'text-white':'text-gray-600'}`}, "Активні"),
-                            React.createElement('button', {onClick:()=>setView('archive'), className:`text-[10px] font-black uppercase ${view==='archive'?'text-white':'text-gray-600'}`}, "Архів")
+                            React.createElement('button', {onClick:()=>setView('active'), className:`text-[10px] font-black uppercase font-bold ${view==='active'?'text-white':'text-gray-600'}`}, "Активні"),
+                            React.createElement('button', {onClick:()=>setView('archive'), className:`text-[10px] font-black uppercase font-bold ${view==='archive'?'text-white':'text-gray-600'}`}, "Архів")
                         )
                     ),
-                    React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-[10px] font-black uppercase text-gray-600"}, "Вихід")
+                    React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-[10px] font-black uppercase text-gray-600 font-bold font-bold font-bold"}, "Вихід")
                 ),
                 React.createElement('main', { className: "p-4 space-y-6 max-w-2xl mx-auto" },
                     myFiltered.map((o) => {
                         const t = getOrderTimers(o);
                         return React.createElement('div', { key: o.id, className: "bg-gray-900 rounded-[2.5rem] border border-gray-800 overflow-hidden" },
-                            React.createElement('div', { className: `p-2 text-[10px] font-black text-center uppercase tracking-widest ${o.archived ? 'bg-gray-800 text-gray-500' : t.bg + ' ' + t.color}` }, 
+                            React.createElement('div', { className: `p-2 text-[10px] font-black text-center uppercase tracking-widest font-bold ${o.archived ? 'bg-gray-800 text-gray-500' : t.bg + ' ' + t.color}` }, 
                                 o.archived ? '📁 АРХІВ' : t.label
                             ),
                             React.createElement('div', {className:"p-6"},
                                 React.createElement('div', {className:"flex justify-between items-start"},
-                                    React.createElement('div', null, React.createElement('p', {className:"font-black text-xl uppercase tracking-tighter"}, PKG[o.package]?.n), React.createElement('p', {className:"text-xs text-gray-500 mt-2 uppercase font-black"}, fD(o.d))),
+                                    React.createElement('div', null, React.createElement('p', {className:"font-black text-xl uppercase tracking-tighter font-bold"}, PKG[o.package]?.n), React.createElement('p', {className:"text-xs text-gray-500 mt-2 uppercase font-black font-bold"}, fD(o.d))),
                                     React.createElement('div', {className:"text-right"}, 
-                                        React.createElement('p', {className:"text-[9px] text-gray-500 uppercase font-black mb-1"}, "ЧАС:"),
-                                        React.createElement('p', {className: `${t.color} font-black text-2xl tracking-tighter`}, o.archived ? "OK" : t.time)
+                                        React.createElement('p', {className:"text-[9px] text-gray-500 uppercase font-black mb-1 font-bold"}, "ЧАС:"),
+                                        React.createElement('p', {className: `${t.color} font-black text-2xl tracking-tighter font-bold`}, o.archived ? "OK" : t.time)
                                     )
                                 ),
-                                o.note && React.createElement('div', {className:"mt-4 bg-blue-600/5 p-4 rounded-2xl border border-blue-600/20 text-xs text-blue-300 italic"}, o.note)
+                                !o.confirmed && !o.archived && React.createElement('button', {
+                                    onClick: () => confirm('Видалити ваш запис?') && deleteDoc(doc(db, 'orders', o.id)),
+                                    className: "w-full mt-4 py-3 border border-red-900/30 text-red-500 text-[10px] font-black uppercase rounded-2xl active:bg-red-900/10 font-bold"
+                                }, "Скасувати запис"),
+                                o.note && React.createElement('div', {className:"mt-4 bg-blue-600/5 p-4 rounded-2xl border border-blue-600/20 text-xs text-blue-300 italic font-bold"}, o.note)
                             )
                         );
                     }),
-                    view === 'active' && React.createElement('div', { className: "bg-gray-900 p-6 rounded-[3rem] border border-gray-800" },
-                        React.createElement('div', { className: "flex gap-2 mb-8 overflow-x-auto pb-4 scrollbar-hide" }, Array.from({length:14}, (_,i)=>{
-                            const d = new Date(); d.setDate(d.getDate()+i+1); const ds = getLocD(d);
+                    view === 'active' && React.createElement('div', { className: "bg-gray-900 p-5 rounded-[2.5rem] border border-gray-800" },
+                        React.createElement('div', { className: "grid grid-cols-7 gap-1 mb-2 text-center" },
+                            ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(d => React.createElement('span', { key: d, className: "text-[8px] font-black text-gray-600 uppercase" }, d))
+                        ),
+                        React.createElement('div', { className: "grid grid-cols-7 gap-2" }, Array.from({length: 14}, (_, i) => {
+                            const d = new Date(); d.setDate(d.getDate() + i + 1);
+                            const ds = getLocD(d);
                             const isFull = checkLimit(ds, selP);
-                            const isFirst = d.getDate() === 1 || i === 0;
-                            return React.createElement(React.Fragment, {key:ds},
-                                isFirst && React.createElement('div', {className:"flex items-center px-1 text-[8px] font-black uppercase text-blue-500 rotate-180", style:{writingMode:'vertical-lr'}}, getM(d)),
-                                React.createElement('button', {
-                                    disabled:isFull, onClick:()=>setSelD(ds),
-                                    className:`min-w-[52px] aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${selD===ds?'bg-blue-600':isFull?'bg-red-600 border border-red-500 cursor-not-allowed opacity-40':'bg-black/40 border border-white/5'}`
-                                }, React.createElement('span', {className:"text-[9px] opacity-40 font-black mb-1"}, WD[d.getDay()]), React.createElement('span', {className:"font-black text-lg"}, d.getDate()))
+                            const isSelected = selD === ds;
+                            return React.createElement('button', {
+                                key: ds, disabled: isFull, onClick: () => setSelD(ds),
+                                className: `aspect-square rounded-xl flex flex-col items-center justify-center transition-all border font-bold 
+                                ${isSelected ? 'bg-blue-600 border-blue-400 scale-105 z-10' : isFull ? 'bg-red-900/20 border-red-900/40 text-red-500 opacity-50' : 'bg-black border-white/5 text-gray-400'}`
+                            }, 
+                                React.createElement('span', { className: "text-[7px] font-bold uppercase mb-0.5" }, WD[d.getDay()]),
+                                React.createElement('span', { className: "font-black text-sm" }, d.getDate())
                             );
                         })),
-                        Object.entries(PKG).map(([k, p]) => React.createElement('button', {
-                            key: k, onClick: () => { setSelP(k); setSelD(null); },
-                            className: `p-5 rounded-[2.5rem] border-2 w-full text-left mb-3 flex justify-between items-center transition ${selP === k ? 'border-blue-600 bg-blue-600/5' : 'border-transparent bg-black/20 opacity-40'}`
-                        }, React.createElement('p', {className:"font-black text-sm uppercase"}, p.n), React.createElement('p', {className:"text-[10px] font-black text-gray-500"}, `~ ${p.d} год.`))),
-                        myFiltered.length >= 2 ? React.createElement('p', {className:"text-center text-red-500 text-[10px] font-black uppercase mt-4"}, "Ліміт активних замовлень") :
-                        React.createElement('button', { 
-                            onClick: async () => {
-                                if (loading) return; setLoading(true);
-                                await addDoc(collection(db,'orders'), {r:profile.r, n:profile.n, d:selD, package:selP, archived:false, confirmed:false, createdAt:serverTimestamp()});
-                                setSelD(null); setLoading(false);
-                            },
-                            disabled: !selD || loading, className: "w-full bg-blue-600 py-5 rounded-[2.5rem] font-black text-lg mt-5 disabled:opacity-20 uppercase font-bold"
-                        }, loading ? "ЗАПИС..." : "ЗАПИСАТИСЯ")
+                        React.createElement('div', { className: "mt-6 space-y-2" }, 
+                            Object.entries(PKG).map(([k, p]) => React.createElement('button', {
+                                key: k, onClick: () => { setSelP(k); setSelD(null); },
+                                className: `p-4 rounded-2xl border w-full text-left flex justify-between items-center transition font-bold ${selP === k ? 'border-blue-600 bg-blue-600/10' : 'border-white/5 bg-black/40 opacity-40'}`
+                            }, 
+                                React.createElement('span', { className: "font-black text-[11px] uppercase" }, p.n),
+                                React.createElement('span', { className: "text-[9px] text-gray-500" }, `${p.d}г.`)
+                            ))
+                        ),
+                        myFiltered.length >= 2 ? 
+                            React.createElement('p', { className: "text-center text-red-500 text-[10px] font-black uppercase mt-4 font-bold" }, "Ліміт замовлень") :
+                            React.createElement('button', { 
+                                onClick: async () => {
+                                    if (loading) return; setLoading(true);
+                                    await addDoc(collection(db,'orders'), {r:profile.r, n:profile.n, d:selD, package:selP, archived:false, confirmed:false, createdAt:serverTimestamp()});
+                                    setSelD(null); setLoading(false);
+                                },
+                                disabled: !selD || loading, 
+                                className: "w-full bg-blue-600 py-5 rounded-3xl font-black text-md mt-4 disabled:opacity-20 uppercase font-bold"
+                            }, loading ? "ЗАПИС..." : "ЗАПИСАТИСЯ")
                     )
                 )
             );
