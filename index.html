@@ -56,7 +56,6 @@
                 return () => { clearInterval(timer); unsub(); };
             }, []);
 
-            // АВТО-АРХІВ: Тільки адмін чистить базу при вході
             React.useEffect(() => {
                 if (profile?.adm && bookings.length > 0) {
                     bookings.forEach(b => {
@@ -84,8 +83,8 @@
             const formatDiff = (d) => `${Math.floor(d / 3600000)}г ${Math.floor((d % 3600000) / 60000)}хв`;
             const fD = d => d ? d.split('-').reverse().slice(0,2).join('.') : '??.??';
 
-            if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans" },
-                React.createElement('div', { onClick: () => { if(prompt('?') === 'Tokyo') { const a = {adm:true, n:'Адмін', r:'ADM'}; localStorage.setItem('l_u', JSON.stringify(a)); setProfile(a); } }, className: "h-20" }),
+            if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans relative" },
+                React.createElement('div', { onClick: () => { if(prompt('?') === 'Tokyo') { const a = {adm:true, n:'Адмін', r:'ADM'}; localStorage.setItem('l_u', JSON.stringify(a)); setProfile(a); } }, className: "absolute top-0 right-0 w-20 h-20 opacity-0" }),
                 React.createElement('h1', { className: "text-2xl font-black text-blue-500 mb-8 text-center uppercase" }, "LAUNDRY"),
                 React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-gray-900 rounded-2xl outline-none" }),
                 React.createElement('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-4 mb-6 bg-gray-900 rounded-2xl outline-none" }),
@@ -98,91 +97,96 @@
                 const filtered = bookings.filter(b => b.d === admD && (view === 'archive' ? b.archived : !b.archived));
 
                 return React.createElement('div', { className: "p-4 bg-black min-h-screen text-white font-sans" },
-                    React.createElement('div', { className: "flex justify-between mb-4 border-b border-white/5 pb-4" }, 
-                        React.createElement('b', {className:"text-yellow-500 text-lg uppercase"}, view === 'active' ? "Адмін" : "Архів"),
-                        React.createElement('button', {onClick:()=>setView(view==='active'?'archive':'active'), className:"text-[9px] text-blue-500 font-black uppercase"}, "ЗМІНИТИ РЕЖИМ")
+                    React.createElement('div', { className: "flex justify-between mb-4 border-b border-white/5 pb-4 items-center" }, 
+                        React.createElement('div', null,
+                            React.createElement('b', {className:"text-yellow-500 text-lg uppercase leading-none block"}, view === 'active' ? "Адмін" : "Архів"),
+                            React.createElement('button', {onClick:()=>setView(view==='active'?'archive':'active'), className:"text-[9px] text-blue-500 font-black uppercase mt-1"}, "ЗМІНИТИ РЕЖИМ")
+                        ),
+                        React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-red-500 text-[10px] font-black uppercase border border-red-500/30 px-3 py-1 rounded-lg"}, "Вихід")
                     ),
-                    // КАЛЕНДАР АДМІНА
                     React.createElement('div', { className: "bg-gray-900 p-4 rounded-3xl border border-gray-800 mb-6" },
                         React.createElement('div', {className:"flex justify-between items-center mb-4"},
-                            React.createElement('button', {onClick:()=>setOff(off-1), className:"text-blue-500 px-4"}, "‹"),
-                            React.createElement('p', {className:"text-[10px] font-black uppercase"}, bDate.toLocaleString('uk-UA', { month: 'long' })),
-                            React.createElement('button', {onClick:()=>setOff(off+1), className:"text-blue-500 px-4"}, "›")
+                            React.createElement('button', {onClick:()=>setOff(off-1), className:"text-blue-500 px-4 text-xl"}, "‹"),
+                            React.createElement('p', {className:"text-[10px] font-black uppercase tracking-widest text-blue-500"}, bDate.toLocaleString('uk-UA', { month: 'long' })),
+                            React.createElement('button', {onClick:()=>setOff(off+1), className:"text-blue-500 px-4 text-xl"}, "›")
                         ),
                         React.createElement('div', { className: "grid grid-cols-7 gap-1" }, days.map(ds => React.createElement('button', {
                             key: ds, onClick:()=>setAdmD(ds),
                             className:`aspect-square rounded-lg flex items-center justify-center border text-[10px] font-black ${admD===ds ? 'bg-yellow-600 border-yellow-400' : bookings.some(b => b.d === ds && (view === 'archive' ? b.archived : !b.archived)) ? 'bg-blue-900/40 border-blue-500/50' : 'bg-black border-white/5 text-gray-600'}`
                         }, new Date(ds).getDate())))
                     ),
-                    // СПИСОК ЗАМОВЛЕНЬ
                     filtered.map(b => React.createElement('div', { key: b.id, className: "bg-gray-900/50 p-5 mb-4 rounded-3xl border border-gray-800" },
                         React.createElement('div', { className: "flex justify-between mb-4" },
-                            React.createElement('div', null, React.createElement('div', {className:"font-black text-xl uppercase"}, `${b.r} — ${b.n}`), React.createElement('div', {className:"text-blue-400 text-[10px] uppercase font-bold"}, PKG[b.package]?.n)),
+                            React.createElement('div', null, React.createElement('div', {className:"font-black text-xl uppercase leading-none"}, `${b.r} — ${b.n}`), React.createElement('div', {className:"text-blue-400 text-[10px] uppercase font-bold mt-1"}, PKG[b.package]?.n)),
                             React.createElement('div', {className:"flex gap-4"},
                                 React.createElement('button', {onClick:()=>confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id))}, "🗑️"),
                                 !b.archived && React.createElement('button', {onClick:()=>confirm('В архів?') && updateDoc(doc(db,'orders',b.id), {archived: true})}, "📥")
                             )
                         ),
-                        // КОМЕНТАР
                         React.createElement('div', {className:"relative mb-4"},
-                            React.createElement('textarea', { id: `n-${b.id}`, defaultValue: b.note || "", placeholder: "Коментар...", className: "w-full bg-black border border-white/10 rounded-xl p-3 text-xs min-h-[60px] outline-none text-blue-300" }),
+                            React.createElement('textarea', { id: `n-${b.id}`, defaultValue: b.note || "", placeholder: "Додати коментар для клієнта...", className: "w-full bg-black border border-white/10 rounded-xl p-3 text-xs min-h-[70px] outline-none text-blue-300" }),
                             React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {note: document.getElementById(`n-${b.id}`).value}), className: "absolute bottom-2 right-2 bg-blue-600 px-3 py-1 rounded-lg text-[8px] font-black" }, "SAVE")
                         ),
-                        // ЧАС ВАРІАЦІЯ
                         React.createElement('div', {className:"flex items-center gap-2 mb-4"},
                             React.createElement('span', {className:"text-[10px] text-gray-500 uppercase font-bold"}, "Годин на прання:"),
-                            React.createElement('input', { type: "number", defaultValue: b.customDuration || PKG[b.package].d, onChange: (e) => updateDoc(doc(db,'orders',b.id), {customDuration: parseInt(e.target.value)}), className: "w-12 bg-gray-800 border border-white/5 rounded p-1 text-[10px] text-center" })
+                            React.createElement('input', { type: "number", defaultValue: b.customDuration || PKG[b.package].d, onChange: (e) => updateDoc(doc(db,'orders',b.id), {customDuration: parseInt(e.target.value)}), className: "w-12 bg-gray-800 border border-white/5 rounded p-1 text-[10px] text-center text-white outline-none focus:border-blue-500" })
                         ),
-                        !b.confirmed && !b.archived && React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {confirmed: true}), className:"w-full bg-blue-600 py-4 rounded-xl text-[10px] font-black uppercase" }, "Підтвердити")
+                        !b.confirmed && !b.archived && React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {confirmed: true}), className:"w-full bg-blue-600 py-4 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-900/20" }, "Підтвердити замовлення")
                     ))
                 );
             }
 
-            // КЛІЄНТСЬКА ЧАСТИНА
             const nextDay = new Date(); nextDay.setDate(nextDay.getDate() + 1);
             const mLabelClient = nextDay.toLocaleString('uk-UA', { month: 'long' });
             const myOrders = bookings.filter(b => b.r === profile.r && b.n.toLowerCase() === profile.n.toLowerCase());
             const myFiltered = (view === 'active' ? myOrders.filter(o => !o.archived) : myOrders.filter(o => o.archived)).sort((a,b) => b.d.localeCompare(a.d));
 
             return React.createElement('div', { className: "min-h-screen bg-black text-white pb-10 font-sans" },
-                React.createElement('header', { className: "p-6 flex justify-between items-center border-b border-white/5" },
-                    React.createElement('b', {className:"text-blue-500 text-xl font-black uppercase"}, profile.n),
-                    React.createElement('button', {onClick:()=>setView(view==='active'?'archive':'active'), className:"text-[10px] font-black uppercase text-gray-500"}, view==='active'?'Архів':'Запис')
+                React.createElement('header', { className: "p-6 flex justify-between items-center border-b border-white/5 sticky top-0 bg-black/80 backdrop-blur-md z-40" },
+                    React.createElement('div', null,
+                        React.createElement('b', {className:"text-blue-500 text-xl font-black uppercase tracking-tight"}, profile.n),
+                        React.createElement('div', {className:"flex gap-4 mt-2 font-bold"},
+                            React.createElement('button', {onClick:()=>setView('active'), className:`text-[10px] font-black uppercase ${view==='active'?'text-white underline underline-offset-4 decoration-blue-500':'text-gray-600'}`}, "Активні"),
+                            React.createElement('button', {onClick:()=>setView('archive'), className:`text-[10px] font-black uppercase ${view==='archive'?'text-white underline underline-offset-4 decoration-blue-500':'text-gray-600'}`}, "Архів")
+                        )
+                    ),
+                    React.createElement('button', {onClick:()=> {localStorage.clear(); location.reload();}, className:"text-[10px] font-black uppercase text-gray-500 border border-white/10 px-3 py-1 rounded-lg"}, "Вихід")
                 ),
                 React.createElement('main', { className: "p-4 space-y-6 max-w-2xl mx-auto" },
                     myFiltered.map(o => {
                         const t = getOrderTimers(o);
                         return React.createElement('div', { key: o.id, className: "bg-gray-900 rounded-[2.5rem] border border-gray-800 overflow-hidden" },
-                            React.createElement('div', { className: `p-2 text-[10px] font-black text-center uppercase ${o.archived ? 'bg-gray-800 text-gray-500' : t.bg + ' ' + t.color}` }, o.archived ? '📁 АРХІВ' : t.label),
+                            React.createElement('div', { className: `p-2 text-[10px] font-black text-center uppercase tracking-tighter ${o.archived ? 'bg-gray-800 text-gray-500' : t.bg + ' ' + t.color}` }, o.archived ? '📁 ЗАМОВЛЕННЯ В АРХІВІ' : t.label),
                             React.createElement('div', {className:"p-6"},
                                 React.createElement('div', {className:"flex justify-between items-center"},
-                                    React.createElement('div', null, React.createElement('p', {className:"font-black text-xl uppercase"}, PKG[o.package]?.n), React.createElement('p', {className:"text-xs text-gray-500 mt-2 font-bold"}, fD(o.d))),
-                                    React.createElement('div', {className:"text-right font-black"}, React.createElement('p', {className:"text-[9px] text-gray-500 uppercase font-bold"}, "ЧАС:"), React.createElement('p', {className: `${t.color} text-2xl`}, o.archived ? "OK" : t.time))
+                                    React.createElement('div', null, React.createElement('p', {className:"font-black text-xl uppercase tracking-tighter leading-none"}, PKG[o.package]?.n), React.createElement('p', {className:"text-xs text-gray-500 mt-2 font-bold uppercase"}, fD(o.d))),
+                                    React.createElement('div', {className:"text-right font-black"}, React.createElement('p', {className:"text-[9px] text-gray-500 uppercase font-bold mb-1"}, "ЧАС:"), React.createElement('p', {className: `${t.color} text-2xl tracking-tighter`}, o.archived ? "OK" : t.time))
                                 ),
-                                o.note && React.createElement('div', {className:"mt-4 bg-blue-600/5 p-4 rounded-2xl border border-blue-600/20 text-xs text-blue-300 italic font-bold"}, o.note)
+                                o.note && React.createElement('div', {className:"mt-4 bg-blue-600/5 p-4 rounded-2xl border border-blue-600/20 text-xs text-blue-300 italic font-medium leading-relaxed"}, "📝 "+o.note)
                             )
                         );
                     }),
-                    view === 'active' && React.createElement('div', { className: "bg-gray-900 p-5 rounded-[2.5rem] border border-gray-800" },
-                        React.createElement('p', {className:"text-[10px] font-black text-blue-500 uppercase mb-4 text-center tracking-tighter"}, mLabelClient),
-                        React.createElement('div', { className: "grid grid-cols-7 gap-2" }, Array.from({length: 14}, (_, i) => {
+                    view === 'active' && React.createElement('div', { className: "bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800" },
+                        React.createElement('p', {className:"text-[11px] font-black text-blue-500 uppercase mb-5 text-center tracking-widest"}, mLabelClient),
+                        React.createElement('div', { className: "grid grid-cols-7 gap-2 mb-6" }, Array.from({length: 14}, (_, i) => {
                             const d = new Date(); d.setDate(d.getDate() + i + 1);
                             const ds = getLocD(d);
+                            const isSelected = selD === ds;
                             return React.createElement('button', {
                                 key: ds, onClick: () => setSelD(ds),
-                                className: `aspect-square rounded-xl flex items-center justify-center border font-bold ${selD === ds ? 'bg-blue-600 border-blue-400' : 'bg-black border-white/5 text-gray-400'}`
+                                className: `aspect-square rounded-xl flex items-center justify-center border transition-all ${isSelected ? 'bg-blue-600 border-blue-400 scale-105 shadow-lg shadow-blue-600/20 text-white font-black' : 'bg-black border-white/5 text-gray-500 font-bold hover:border-white/20'}`
                             }, d.getDate());
                         })),
-                        React.createElement('div', { className: "mt-6 space-y-2 mb-6" }, 
+                        React.createElement('div', { className: "space-y-3 mb-8" }, 
                             Object.entries(PKG).map(([k, p]) => React.createElement('button', {
                                 key: k, onClick: () => { setSelP(k); setSelD(null); },
-                                className: `p-4 rounded-2xl border w-full flex justify-between items-center font-bold ${selP === k ? 'border-blue-600 bg-blue-600/10' : 'border-white/5 opacity-40'}`
-                            }, React.createElement('span', { className: "font-black text-[11px] uppercase" }, p.n), React.createElement('span', { className: "text-[9px] text-gray-500" }, `${p.d}г.`)))
+                                className: `p-5 rounded-2xl border w-full flex justify-between items-center transition-all ${selP === k ? 'border-blue-600 bg-blue-600/10' : 'border-white/5 bg-black/40 opacity-40 hover:opacity-60'}`
+                            }, React.createElement('span', { className: "font-black text-xs uppercase tracking-tight" }, p.n), React.createElement('span', { className: "text-[10px] text-gray-500 font-black" }, `${p.d} год.`)))
                         ),
                         React.createElement('button', { 
                             onClick: async () => { if(loading) return; setLoading(true); await addDoc(collection(db,'orders'), {r:profile.r, n:profile.n, d:selD, package:selP, archived:false, confirmed:false, createdAt:serverTimestamp()}); setSelD(null); setLoading(false); },
-                            disabled: !selD || loading, className: "w-full bg-blue-600 py-5 rounded-3xl font-black text-md disabled:opacity-20 uppercase"
-                        }, loading ? "ЗАПИС..." : "ЗАПИСАТИСЯ")
+                            disabled: !selD || loading, className: "w-full bg-blue-600 py-5 rounded-3xl font-black text-md disabled:opacity-20 uppercase tracking-widest active:scale-[0.98] transition-transform"
+                        }, loading ? "ОБРОБКА..." : "ЗАБЕРІТЬ РЕЧІ ЗАВТРА")
                     )
                 )
             );
