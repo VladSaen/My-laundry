@@ -25,18 +25,15 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // Функція для визначення моделі пристрою
+        // Визначаємо модель телефону
         const getDeviceModel = () => {
             const ua = navigator.userAgent;
             if (/iPhone/i.test(ua)) return "iPhone";
-            if (/iPad/i.test(ua)) return "iPad";
             if (/Android/i.test(ua)) {
                 const match = ua.match(/Android\s([^\s;]+|.*?\s)(Build|[;)])/);
-                return match ? "Android (" + match[1].replace(';','') + ")" : "Android Device";
+                return match ? "Android " + match[1].split(';')[0] : "Android";
             }
-            if (/Windows/i.test(ua)) return "Windows PC";
-            if (/Macintosh/i.test(ua)) return "MacBook";
-            return "Unknown Device";
+            return "PC/Other";
         };
 
         const PKG = { 
@@ -47,7 +44,10 @@
         const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
         function App() {
-            const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
+            const [profile, setProfile] = React.useState(() => {
+                const saved = localStorage.getItem('l_u');
+                return saved ? JSON.parse(saved) : null;
+            });
             const [bookings, setBookings] = React.useState([]);
             const [view, setView] = React.useState('active'); 
             const [admD, setAdmD] = React.useState(new Date().toISOString().split('T')[0]);
@@ -75,20 +75,21 @@
             const getStats = () => {
                 const users = {};
                 bookings.forEach(b => {
-                    const key = `${b.n.toLowerCase().trim()}_${b.r}`;
-                    if (!users[key]) users[key] = { n: b.n, r: b.r, device: b.dev || 'Невідомо', orders: [] };
+                    const key = `${b.n?.toLowerCase().trim()}_${b.r}`;
+                    if (!users[key]) users[key] = { n: b.n, r: b.r, device: b.dev || '?', orders: [] };
                     users[key].orders.push(b);
                 });
                 return Object.values(users).sort((a,b) => b.orders.length - a.orders.length);
             };
 
+            // ЯКЩО НЕМАЄ ПРОФІЛЮ — ПОКАЗУЄМО ВХІД
             if (!profile) return (
-                <div className="min-h-screen bg-black text-white flex flex-col justify-center p-8">
-                    <h1 className="text-2xl font-black text-blue-500 mb-8 text-center uppercase tracking-tighter">Вхід</h1>
-                    <input id="n" placeholder="Ім'я" className="p-4 mb-4 bg-gray-900 rounded-2xl outline-none border border-white/5" />
-                    <input id="r" type="number" placeholder="Номер кімнати" className="p-4 mb-8 bg-gray-900 rounded-2xl outline-none border border-white/5" />
+                <div className="min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans">
+                    <h1 className="text-2xl font-black text-blue-500 mb-8 text-center uppercase">Вхід</h1>
+                    <input id="n_in" placeholder="Ваше ім'я" className="p-4 mb-4 bg-gray-900 rounded-2xl outline-none border border-white/5" />
+                    <input id="r_in" type="number" placeholder="Кімната" className="p-4 mb-8 bg-gray-900 rounded-2xl outline-none border border-white/5" />
                     <button onClick={() => {
-                        const n = document.getElementById('n').value.trim(), r = document.getElementById('r').value.trim();
+                        const n = document.getElementById('n_in').value.trim(), r = document.getElementById('r_in').value.trim();
                         if(n && r) {
                             const u = {n, r, adm: n.toLowerCase() === 'admin' && r === '777'};
                             localStorage.setItem('l_u', JSON.stringify(u));
@@ -98,9 +99,9 @@
                 </div>
             );
 
+            // АДМІН-ПАНЕЛЬ
             if (profile.adm) return (
                 <div className="p-4 bg-black min-h-screen text-white font-sans pb-20">
-                    {/* ТАБИ */}
                     <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                         <div className="flex gap-4">
                             {['active', 'archive', 'stats'].map(v => (
@@ -114,11 +115,10 @@
 
                     {view !== 'stats' ? (
                         <>
-                            {/* КАЛЕНДАР-СІТКА */}
                             <div className="bg-gray-900 rounded-3xl p-5 mb-6 border border-gray-800">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex justify-between items-center mb-6 px-1">
                                     <button onClick={() => setCurMonth(new Date(year, month - 1))}>←</button>
-                                    <b className="uppercase text-xs text-blue-400">{curMonth.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</b>
+                                    <b className="uppercase text-[10px] tracking-widest text-blue-400">{curMonth.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</b>
                                     <button onClick={() => setCurMonth(new Date(year, month + 1))}>→</button>
                                 </div>
                                 <div className="grid grid-cols-7 gap-2 text-center">
@@ -139,19 +139,17 @@
                                     })}
                                 </div>
                             </div>
-
-                            {/* СПИСОК ЗАМОВЛЕНЬ */}
                             <div className="space-y-3">
                                 {bookings.filter(b => b.d === admD && (view === 'archive' ? b.archived : !b.archived)).map(b => (
                                     <div key={b.id} className="bg-gray-900 p-5 rounded-3xl border border-white/5">
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between items-center">
                                             <div>
-                                                <div className="font-black text-lg uppercase leading-none">№{b.r} — {b.n}</div>
-                                                <div className="text-[9px] text-gray-500 mt-2 uppercase font-black">📱 {b.dev || 'Невідомий пристрій'}</div>
+                                                <div className="font-black text-lg uppercase tracking-tighter">{b.n} (к. {b.r})</div>
+                                                <div className="text-[9px] text-gray-500 mt-1 font-black">📱 {b.dev || 'Device Unknown'}</div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                {!b.archived && <button onClick={() => updateDoc(doc(db,'orders',b.id), {archived:true})}>✅</button>}
-                                                <button onClick={() => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id))}>🗑️</button>
+                                            <div className="flex gap-4">
+                                                {!b.archived && <button onClick={() => updateDoc(doc(db,'orders',b.id), {archived:true})} className="text-xl">✅</button>}
+                                                <button onClick={() => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id))} className="text-xl">🗑️</button>
                                             </div>
                                         </div>
                                     </div>
@@ -159,17 +157,16 @@
                             </div>
                         </>
                     ) : (
-                        /* СТАТИСТИКА З ПРИСТРОЯМИ */
                         <div className="space-y-4">
                             {getStats().map(u => (
                                 <div key={u.n+u.r} className="bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800">
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex justify-between items-center">
                                         <div>
-                                            <h4 className="text-xl font-black uppercase tracking-tighter">{u.n}</h4>
-                                            <p className="text-blue-500 text-[10px] font-black uppercase">Кімната {u.r}</p>
-                                            <p className="text-gray-500 text-[9px] mt-2 font-bold italic">📱 {u.device}</p>
+                                            <h4 className="text-xl font-black uppercase">{u.n}</h4>
+                                            <p className="text-blue-500 text-[10px] font-black uppercase tracking-widest">Кімната {u.r}</p>
+                                            <p className="text-gray-600 text-[9px] mt-2 italic font-bold">📱 {u.device}</p>
                                         </div>
-                                        <div className="bg-blue-600 px-3 py-1 rounded-full text-[10px] font-black">{u.orders.length} прань</div>
+                                        <div className="bg-blue-600/20 border border-blue-600/30 px-4 py-2 rounded-2xl text-[10px] font-black text-blue-400">{u.orders.length} ПРАНЬ</div>
                                     </div>
                                 </div>
                             ))}
@@ -178,32 +175,36 @@
                 </div>
             );
 
-            // КЛІЄНТСЬКА ЧАСТИНА (ДЛЯ ТЕСТУ)
+            // КЛІЄНТСЬКА ПАНЕЛЬ
             return (
-                <div className="p-8 bg-black min-h-screen text-white text-center flex flex-col items-center justify-center">
-                    <div className="text-4xl mb-4">🧺</div>
-                    <h2 className="text-xl font-black uppercase mb-6 text-blue-500">Записати нове прання</h2>
+                <div className="p-8 bg-black min-h-screen text-white flex flex-col items-center justify-center font-sans">
+                    <div className="w-20 h-20 bg-blue-600 rounded-[2.5rem] mb-8 flex items-center justify-center text-4xl shadow-2xl shadow-blue-900/50">🧺</div>
+                    <h2 className="text-2xl font-black uppercase mb-2 tracking-tighter">Вітаємо, {profile.n}!</h2>
+                    <p className="text-gray-500 text-sm mb-12 text-center max-w-[200px]">Виберіть дату, щоб записатися на прання</p>
+                    
                     <button onClick={async () => {
-                        const date = prompt("Введіть дату (YYYY-MM-DD)", new Date().toISOString().split('T')[0]);
+                        const date = prompt("Дата (РРРР-ММ-ДД):", new Date().toISOString().split('T')[0]);
                         if(date) {
                             await addDoc(collection(db,'orders'), {
                                 r: profile.r, n: profile.n, d: date, 
                                 package: 'small', archived: false, 
-                                dev: getDeviceModel(), // Записуємо модель пристрою
+                                dev: getDeviceModel(), 
                                 createdAt: serverTimestamp()
                             });
-                            alert("Готово!");
+                            alert("Запис створено!");
                         }
-                    }} className="bg-blue-600 px-10 py-5 rounded-full font-black uppercase">Забронювати</button>
+                    }} className="w-full max-w-xs bg-blue-600 py-5 rounded-[2.5rem] font-black uppercase shadow-xl">Забронювати</button>
+                    
+                    <button onClick={() => {localStorage.clear(); location.reload();}} className="mt-10 text-[10px] text-gray-700 font-black uppercase tracking-widest">Вийти</button>
                 </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(React.createElement(App));
     </script>
     <style>
-        body { background: black; margin: 0; font-family: system-ui; -webkit-font-smoothing: antialiased; }
+        body { background: black; margin: 0; font-family: -apple-system, sans-serif; overflow-x: hidden; }
         ::-webkit-scrollbar { display: none; }
     </style>
 </head>
