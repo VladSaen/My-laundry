@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Laundry</title>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
+    <script type="text/babel">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -25,161 +26,174 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // МАКСИМАЛЬНА ІНФОРМАЦІЯ ПРО ПРИСТРІЙ
         const getFullDev = () => {
             const ua = navigator.userAgent;
-            const screenRes = `${window.screen.width}x${window.screen.height}`;
-            let device = "PC";
-            
-            if (/iPhone/i.test(ua)) {
-                device = `iPhone (${screenRes})`;
-            } else if (/Android/i.test(ua)) {
-                const match = ua.match(/Android\s([^\s;]+|.*?\s)(Build|[;)])/);
+            const res = `${window.screen.width}x${window.screen.height}`;
+            if (/iPhone/i.test(ua)) return `iPhone (${res})`;
+            if (/Android/i.test(ua)) {
                 const model = ua.match(/\(([^;]+);([^;]+);([^;?]+)\)/);
-                device = `Android ${match ? match[1] : ''} ${model ? model[3] : ''} (${screenRes})`.trim();
-            } else if (/Macintosh/i.test(ua)) {
-                device = `MacBook (${screenRes})`;
+                return `Android ${model ? model[3].trim() : ''} (${res})`;
             }
-            
-            return device;
+            return `PC (${res})`;
         };
 
-        const PKG = { small: 'До 3 кг', medium: '3-5 кг', large: '5+ кг' };
         const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
         function App() {
             const [profile, setProfile] = React.useState(() => JSON.parse(localStorage.getItem('l_u')));
             const [bookings, setBookings] = React.useState([]);
             const [view, setView] = React.useState('active'); 
-            const [admD, setAdmD] = React.useState(new Date().toISOString().split('T')[0]);
-            const [curMonth, setCurMonth] = React.useState(new Date());
+            const [selD, setSelD] = React.useState(new Date().toISOString().split('T')[0]);
+            const [curM, setCurM] = React.useState(new Date());
 
             React.useEffect(() => {
                 signInAnonymously(auth);
                 return onSnapshot(collection(db, 'orders'), s => setBookings(s.docs.map(d => ({ id: d.id, ...d.data() }))));
             }, []);
 
-            if (!profile) return React.createElement('div', { className: "p-8 bg-black min-h-screen text-white flex flex-col justify-center font-sans" },
-                React.createElement('h1', { className: "text-2xl font-black mb-8 text-center uppercase tracking-tighter" }, "Вхід"),
-                React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-gray-900 rounded-2xl outline-none border border-white/5" }),
-                React.createElement('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-4 mb-8 bg-gray-900 rounded-2xl outline-none border border-white/5" }),
-                React.createElement('button', { 
-                    onClick: () => {
-                        const n = document.getElementById('n').value, r = document.getElementById('r').value;
-                        if(n && r) { 
-                            const u = {n, r, adm: n.toLowerCase()==='admin' && r==='777'}; 
-                            localStorage.setItem('l_u', JSON.stringify(u)); 
-                            setProfile(u); 
+            const renderCalendar = (onDayClick, selectedDay) => {
+                const y = curM.getFullYear(), m = curM.getMonth();
+                const first = new Date(y, m, 1).getDay();
+                const offset = first === 0 ? 6 : first - 1;
+                const days = new Date(y, m + 1, 0).getDate();
+
+                return (
+                    <div className="bg-gray-900 rounded-[2.5rem] p-6 border border-white/5 shadow-2xl mb-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <button onClick={() => setCurM(new Date(y, m - 1))} className="p-2 opacity-50">←</button>
+                            <b className="uppercase text-[10px] tracking-widest text-blue-400">{curM.toLocaleString('uk-UA', { month: 'long', year: 'numeric' })}</b>
+                            <button onClick={() => setCurM(new Date(y, m + 1))} className="p-2 opacity-50">→</button>
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                            {WD.map(d => <div key={d} className="text-[8px] text-gray-700 text-center font-black uppercase">{d}</div>)}
+                            {Array(offset).fill(0).map((_, i) => <div key={'o'+i}></div>)}
+                            {Array.from({length: days}, (_, i) => {
+                                const d = i + 1;
+                                const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                                const act = bookings.filter(b => b.d === ds && !b.archived);
+                                const isFull = act.length >= 2;
+                                return (
+                                    <div key={d} onClick={() => onDayClick(ds)}
+                                        className={`aspect-square flex items-center justify-center rounded-2xl text-xs font-black border transition-all cursor-pointer
+                                        ${selectedDay === ds ? 'bg-blue-600 border-blue-400 scale-110 shadow-lg' : isFull ? 'bg-red-900/10 border-red-900/20 text-red-500' : 'bg-black/40 border-white/5'}`}>
+                                        {d}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+
+            if (!profile) return (
+                <div className="min-h-screen bg-black text-white flex flex-col justify-center p-8">
+                    <h1 className="text-2xl font-black text-blue-500 mb-8 text-center uppercase tracking-tighter">Вхід</h1>
+                    <input id="n" placeholder="Ім'я" className="p-5 mb-4 bg-gray-900 rounded-[2rem] outline-none border border-white/5" />
+                    <input id="r" type="number" placeholder="Номер кімнати" className="p-5 mb-8 bg-gray-900 rounded-[2rem] outline-none border border-white/5" />
+                    <button onClick={() => {
+                        const n = document.getElementById('n').value.trim(), r = document.getElementById('r').value.trim();
+                        if(n && r) {
+                            const u = {n, r, adm: n.toLowerCase()==='admin' && r==='777'};
+                            localStorage.setItem('l_u', JSON.stringify(u));
+                            setProfile(u);
                         }
-                    }, className: "bg-blue-600 py-4 rounded-2xl font-black uppercase" 
-                }, "Увійти")
+                    }} className="bg-blue-600 py-5 rounded-[2rem] font-black uppercase">Увійти</button>
+                </div>
             );
 
             if (profile.adm) {
-                const year = curMonth.getFullYear(), month = curMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const offset = firstDay === 0 ? 6 : firstDay - 1;
-
-                const users = {};
+                const stats = {};
                 bookings.forEach(b => {
-                    const k = `${b.n.toLowerCase().trim()}_${b.r}`;
-                    if(!users[k]) users[k] = { n: b.n, r: b.r, d: b.dev || '?', o: [] };
-                    users[k].o.push(b);
+                    const k = `${b.n.toLowerCase()}_${b.r}`;
+                    if(!stats[k]) stats[k] = { n: b.n, r: b.r, d: b.dev || '?', o: [] };
+                    stats[k].o.push(b);
                 });
 
-                return React.createElement('div', { className: "p-4 bg-black min-h-screen text-white font-sans" },
-                    React.createElement('div', { className: "flex justify-between mb-8 border-b border-white/10 pb-4 text-[10px] font-black uppercase tracking-widest" },
-                        React.createElement('div', { className: "flex gap-4" },
-                            React.createElement('button', { onClick: () => setView('active'), className: view==='active'?'text-blue-500':'text-gray-500' }, "Календар"),
-                            React.createElement('button', { onClick: () => setView('archive'), className: view==='archive'?'text-blue-500':'text-gray-500' }, "Архів"),
-                            React.createElement('button', { onClick: () => setView('stats'), className: view==='stats'?'text-blue-500':'text-gray-500' }, "Статистика")
-                        ),
-                        React.createElement('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "text-red-500" }, "Вихід")
-                    ),
+                return (
+                    <div className="p-4 bg-black min-h-screen text-white pb-24">
+                        <div className="flex justify-between mb-8 border-b border-white/10 pb-4 text-[10px] font-black uppercase">
+                            <div className="flex gap-4">
+                                {['active', 'archive', 'stats'].map(v => (
+                                    <button key={v} onClick={() => setView(v)} className={view===v?'text-blue-500':'text-gray-500'}>
+                                        {v==='active'?'Календар':v==='archive'?'Архів':'Статистика'}
+                                    </button>
+                                ))}
+                            </div>
+                            <button onClick={() => {localStorage.clear(); location.reload();}} className="text-red-500">Вихід</button>
+                        </div>
 
-                    view !== 'stats' ? React.createElement(React.Fragment, null,
-                        React.createElement('div', { className: "bg-gray-900 rounded-[2rem] p-6 mb-6 border border-gray-800 shadow-2xl" },
-                            React.createElement('div', { className: "flex justify-between mb-6 px-2 items-center" },
-                                React.createElement('button', { onClick: () => setCurMonth(new Date(year, month-1)), className: "text-xl" }, "←"),
-                                React.createElement('b', { className: "uppercase text-[11px] text-blue-400 tracking-tighter" }, curMonth.toLocaleString('uk-UA', {month:'long', year:'numeric'})),
-                                React.createElement('button', { onClick: () => setCurMonth(new Date(year, month+1)), className: "text-xl" }, "→")
-                            ),
-                            React.createElement('div', { className: "grid grid-cols-7 gap-2" },
-                                WD.map(d => React.createElement('div', { key: d, className: "text-[9px] text-gray-700 text-center font-black uppercase" }, d)),
-                                Array(offset).fill(0).map((_, i) => React.createElement('div', { key: 'o'+i })),
-                                Array.from({length: daysInMonth}, (_, i) => {
-                                    const d = i + 1, ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                                    const act = bookings.filter(b => b.d === ds && !b.archived);
-                                    const full = act.length >= 2;
-                                    return React.createElement('div', { 
-                                        key: d, onClick: () => setAdmD(ds),
-                                        className: `aspect-square flex items-center justify-center rounded-xl text-xs font-black border transition-all ${admD===ds?'bg-blue-600 border-blue-400 scale-110 shadow-lg shadow-blue-900/40':'bg-black/40 border-white/5'} ${full && admD!==ds ? 'text-red-500 border-red-900/30':''}`
-                                    }, d);
-                                })
-                            )
-                        ),
-                        React.createElement('h3', {className: "text-[10px] font-black text-gray-600 uppercase mb-4 px-2"}, `Замовлення на ${admD}:`),
-                        bookings.filter(b => b.d === admD && (view==='archive'?b.archived:!b.archived)).map(b => 
-                            React.createElement('div', { key: b.id, className: "bg-gray-900/80 p-5 rounded-3xl mb-3 flex justify-between items-center border border-white/5 shadow-lg" },
-                                React.createElement('div', null, 
-                                    React.createElement('div', {className:"font-black uppercase text-lg leading-tight tracking-tighter"}, `${b.n} (к. ${b.r})`),
-                                    React.createElement('div', {className:"text-[9px] text-blue-500 font-black uppercase mt-1"}, `📱 ${b.dev||'Дані відсутні'}`)
-                                ),
-                                React.createElement('div', {className:"flex gap-4"},
-                                    !b.archived && React.createElement('button', { onClick: () => updateDoc(doc(db,'orders',b.id), {archived:true}), className: "text-xl" }, "✅"),
-                                    React.createElement('button', { onClick: () => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id)), className: "text-xl opacity-30" }, "🗑️")
-                                )
-                            )
-                        )
-                    ) : React.createElement('div', { className: "space-y-4" },
-                        Object.values(users).sort((a,b)=>b.o.length - a.o.length).map(u => 
-                            React.createElement('div', { key: u.n+u.r, className: "bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800 shadow-xl" },
-                                React.createElement('div', { className: "flex justify-between items-start" },
-                                    React.createElement('div', null, 
-                                        React.createElement('b', {className:"uppercase text-xl block leading-none tracking-tighter mb-1"}, u.n),
-                                        React.createElement('span', {className:"text-blue-500 text-[10px] font-black uppercase tracking-widest"}, `КІМНАТА ${u.r}`),
-                                        React.createElement('div', {className:"mt-4 pt-4 border-t border-white/5"},
-                                            React.createElement('p', {className:"text-[9px] text-gray-500 font-bold uppercase mb-1"}, "Останній пристрій:"),
-                                            React.createElement('p', {className:"text-[10px] text-gray-300 font-black leading-tight"}, u.d)
-                                        )
-                                    ),
-                                    React.createElement('div', {className:"text-[10px] font-black bg-blue-600/20 text-blue-400 border border-blue-600/30 px-4 py-2 rounded-2xl"}, `${u.o.length} ПРАНЬ`)
-                                )
-                            )
-                        )
-                    )
+                        {view !== 'stats' ? (
+                            <>
+                                {renderCalendar(setSelD, selD)}
+                                <div className="space-y-3">
+                                    {bookings.filter(b => b.d === selD && (view==='archive' ? b.archived : !b.archived)).map(b => (
+                                        <div key={b.id} className="bg-gray-900 p-5 rounded-[2.5rem] flex justify-between items-center border border-white/5">
+                                            <div>
+                                                <div className="font-black text-lg uppercase tracking-tighter">{b.n} (к.{b.r})</div>
+                                                <div className="text-[9px] text-gray-500 font-bold mt-1 uppercase">📱 {b.dev || 'Невідомо'}</div>
+                                            </div>
+                                            <div className="flex gap-4">
+                                                {!b.archived && <button onClick={() => updateDoc(doc(db,'orders',b.id),{archived:true})} className="text-2xl">✅</button>}
+                                                <button onClick={() => confirm('Видалити?') && deleteDoc(doc(db,'orders',b.id))} className="text-xl opacity-20">🗑️</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="space-y-4">
+                                {Object.values(stats).sort((a,b)=>b.o.length-a.o.length).map(u => (
+                                    <div key={u.n+u.r} className="bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <b className="uppercase text-xl block mb-1">{u.n}</b>
+                                                <span className="text-blue-500 text-[10px] font-black uppercase">Кімната {u.r}</span>
+                                                <p className="text-[9px] text-gray-600 mt-4 uppercase font-bold tracking-widest">Пристрій:</p>
+                                                <p className="text-[10px] text-gray-300 font-black">{u.d}</p>
+                                            </div>
+                                            <div className="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-2xl text-xs font-black">{u.o.length} прань</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 );
             }
 
-            return React.createElement('div', { className: "p-10 bg-black min-h-screen text-white text-center font-sans flex flex-col items-center justify-center" },
-                React.createElement('div', { className: "w-24 h-24 bg-blue-600 rounded-[2.5rem] mb-8 flex items-center justify-center text-4xl shadow-2xl shadow-blue-900/40" }, "🧺"),
-                React.createElement('h2', { className: "text-2xl font-black uppercase mb-2 tracking-tighter" }, `Привіт, ${profile.n}`),
-                React.createElement('p', { className: "text-gray-500 text-sm mb-12 max-w-[200px]" }, "Запишіться на вільний день у календарі"),
-                React.createElement('button', { 
-                    onClick: async () => {
-                        const d = prompt("Вкажіть дату (РРРР-ММ-ДД):", new Date().toISOString().split('T')[0]);
-                        if(d) await addDoc(collection(db,'orders'), { 
-                            r: profile.r, 
-                            n: profile.n, 
-                            d: d, 
-                            archived: false, 
-                            dev: getFullDev(), // ПОВНА ІНФА ПРИ ЗАПИСІ
-                            createdAt: serverTimestamp() 
-                        });
-                    }, className: "bg-blue-600 px-12 py-5 rounded-[2rem] font-black uppercase shadow-xl w-full max-w-xs transition-transform active:scale-95" 
-                }, "Записатись"),
-                React.createElement('button', { onClick: () => {localStorage.clear(); location.reload();}, className: "mt-12 text-[10px] text-gray-700 uppercase font-black tracking-widest" }, "Вийти з кабінету")
+            return (
+                <div className="p-8 bg-black min-h-screen text-white flex flex-col font-sans">
+                    <div className="flex justify-between items-center mb-8">
+                        <div className="text-2xl font-black uppercase tracking-tighter">Привіт, {profile.n}</div>
+                        <button onClick={() => {localStorage.clear(); location.reload();}} className="text-[10px] text-gray-600 font-black uppercase border border-white/5 px-3 py-1 rounded-full">Вихід</button>
+                    </div>
+                    
+                    <p className="text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest">1. Обери день у календарі:</p>
+                    {renderCalendar(setSelD, selD)}
+
+                    <div className="mt-auto">
+                        <button onClick={async () => {
+                            const isFull = bookings.filter(b => b.d === selD && !b.archived).length >= 2;
+                            if(isFull) return alert("Цей день вже зайнятий!");
+                            await addDoc(collection(db,'orders'), {
+                                r: profile.r, n: profile.n, d: selD, archived: false,
+                                dev: getFullDev(), createdAt: serverTimestamp()
+                            });
+                            alert("Успішно записано на " + selD);
+                        }} className="w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase shadow-xl shadow-blue-900/30 text-lg">
+                            Записатись на {selD.split('-').reverse().slice(0,2).join('.')}
+                        </button>
+                    </div>
+                </div>
             );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        root.render(<App />);
     </script>
     <style>
-        body { background: black; margin: 0; font-family: system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+        body { background: black; margin: 0; font-family: system-ui; -webkit-font-smoothing: antialiased; }
         ::-webkit-scrollbar { display: none; }
-        input { -webkit-appearance: none; }
     </style>
 </head>
 <body><div id="root"></div></body>
