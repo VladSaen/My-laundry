@@ -85,9 +85,9 @@
 
             if (!profile) return React.createElement('div', { className: "min-h-screen bg-black text-white flex flex-col justify-center p-8 font-sans relative" },
                 React.createElement('div', { onClick: () => { if(prompt('?') === 'Tokyo') { const a = {adm:true, n:'Адмін', r:'ADM'}; localStorage.setItem('l_u', JSON.stringify(a)); setProfile(a); } }, className: "absolute top-0 right-0 w-20 h-20 opacity-0" }),
-                React.createElement('h1', { className: "text-2xl font-black text-blue-500 mb-8 text-center uppercase tracking-[0.2em]" }, "LAUNDRY"),
+                React.createElement('h1', { className: "text-2xl font-black text-blue-500 mb-8 text-center uppercase tracking-[0.2em]" }, "Авторизація"),
                 React.createElement('input', { id: "n", placeholder: "Ваше ім'я", className: "p-4 mb-4 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-blue-500 transition-all shadow-inner" }),
-                React.createElement('input', { id: "r", type: "number", placeholder: "Кімната", className: "p-4 mb-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-blue-500 transition-all shadow-inner" }),
+                React.createElement('input', { id: "r", type: "number", placeholder: "Камера", className: "p-4 mb-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-blue-500 transition-all shadow-inner" }),
                 React.createElement('button', { onClick: () => { const n = document.getElementById('n').value.trim(), r = document.getElementById('r').value; if(n && r) { const u={n, r, adm:false}; localStorage.setItem('l_u', JSON.stringify(u)); setProfile(u); } }, className: "bg-blue-600 py-4 rounded-2xl font-black uppercase shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-95 transition-all" }, "УВІЙТИ")
             );
 
@@ -196,7 +196,7 @@
                         React.createElement('button', { 
                             onClick: async () => { if(loading) return; setLoading(true); await addDoc(collection(db,'orders'), {r:profile.r, n:profile.n, d:selD, package:selP, archived:false, confirmed:false, createdAt:serverTimestamp()}); setSelD(null); setLoading(false); },
                             disabled: !selD || loading, className: "w-full bg-blue-600 py-5 rounded-3xl font-black text-md disabled:opacity-20 uppercase tracking-widest shadow-[0_10px_30px_rgba(37,99,235,0.3)] active:scale-95 transition-all"
-                        }, loading ? "ОБРОБКА..." : "ЗАБЕРІТЬ РЕЧІ ЗАВТРА")
+                        }, loading ? "ОБРОБКА..." : "ЗАПИСАТИСЬ")
                     )
                 )
             );
